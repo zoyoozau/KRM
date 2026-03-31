@@ -149,9 +149,11 @@ function TypeBarChart({data}){
   const max=Math.max(...data.flatMap(d=>[d.ทดลอง??0,d.รูปธรรม??0]),1);
   const H=130,BW=22,GAP=4,GG=18;
   const svgW=data.length*(BW*2+GAP+GG)+GG*2;
+  // กำหนดความกว้างตามจำนวน group (ไม่ให้ยืดเต็มจอเมื่อ group น้อย)
+  const displayW=Math.max(svgW, 180);
   return(
     <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${svgW} ${H+50}`} width="100%" style={{minWidth:180}}>
+      <svg viewBox={`0 0 ${svgW} ${H+50}`} width={displayW} style={{maxWidth:'100%',display:'block'}}>
         {data.map((d,gi)=>{
           const x=gi*(BW*2+GAP+GG)+GG;
           const hT=(d.ทดลอง??0)/max*H,hR=(d.รูปธรรม??0)/max*H;
@@ -233,7 +235,9 @@ export default function Dashboard(){
   const totalTargetG=filtered.reduce((s,r)=>s+getTargetG(r),0);
   const mentorSet=[...new Set(filtered.map(getMentor).filter(Boolean))];
 
-  const pieRegion=REGIONS.map(reg=>({label:reg,value:filtered.filter(r=>getRegion(r)===reg).length})).filter(d=>d.value>0);
+  // pie chart ใช้ทุกแถว (ไม่ filter) เพื่อให้วงกลมแสดงครบทุกภาคเสมอ
+  // การ filter ทำหน้าที่ highlight ชิ้นที่ active เท่านั้น
+  const pieRegion=REGIONS.map(reg=>({label:reg,value:rows.filter(r=>getRegion(r)===reg).length})).filter(d=>d.value>0);
 
   const barData=REGIONS.map(reg=>{
     const rs=filtered.filter(r=>getRegion(r)===reg);
