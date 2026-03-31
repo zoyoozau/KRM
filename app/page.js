@@ -2,12 +2,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 
-// ── GOOGLE SHEETS CSV EXPORT ──────────────────────────────────────────────────
-const SHEET_ID = '1uFaWzUV8J8HxCDk6rSiUlqAmhiyt9JT3b1yeonWQNK0';
+// ─── DATA SOURCE ──────────────────────────────────────────────────────────────
+const SHEET_ID  = '1uFaWzUV8J8HxCDk6rSiUlqAmhiyt9JT3b1yeonWQNK0';
 const SHEET_GID = '1566885801';
-const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
+const CSV_URL   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
 
-// ── COLORS ────────────────────────────────────────────────────────────────────
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const REGION_COLORS = {
   'ภาคเหนือ':      '#EF4444',
   'ใต้':           '#3B82F6',
@@ -15,60 +15,82 @@ const REGION_COLORS = {
   'กทม.ตะวันออก': '#22C55E',
   'กลางตะวันตก':  '#EAB308',
 };
-const TYPE_COLORS = { ทดลอง: '#94A3B8', รูปธรรม: '#EF4444' };
-const REGIONS = ['ภาคเหนือ', 'ใต้', 'ภาคอีสาน', 'กทม.ตะวันออก', 'กลางตะวันตก'];
+const ISSUE_COLORS = ['#6366F1','#EC4899','#14B8A6','#F59E0B','#84CC16','#06B6D4','#8B5CF6'];
+const REGIONS = Object.keys(REGION_COLORS);
 
-// ── CSV PARSER ────────────────────────────────────────────────────────────────
+// ─── CSV PARSER ───────────────────────────────────────────────────────────────
+// Sheets format: row1=title, row2=section headers (merged), row3=column headers, row4+=data
 function parseCSV(text) {
-  const lines = text.trim().split('\n');
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-  return lines.slice(1).map(line => {
-    const vals = [];
+  const rawLines = text.split('\n').map(l => l.replace(/\r$/, ''));
+  if (rawLines.length < 4) return [];
+
+  // Parse a single CSV line handling quoted fields
+  const parseLine = (line) => {
+    const fields = [];
     let cur = '', inQ = false;
     for (const ch of line) {
       if (ch === '"') { inQ = !inQ; }
-      else if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
+      else if (ch === ',' && !inQ) { fields.push(cur); cur = ''; }
       else { cur += ch; }
     }
-    vals.push(cur.trim());
+    fields.push(cur);
+    return fields.map(f => f.trim());
+  };
+
+  // Row 3 (index 2) = headers
+  const headers = parseLine(rawLines[2]).map(h =>
+    h.replace(/^["']|["']$/g, '')   // remove quotes
+     .replace(/^#\s*/, '')          // remove # prefix (number type indicator)
+     .replace(/\n/g, ' ')           // collapse newlines
+     .trim()
+  );
+
+  // Row 4+ = data
+  return rawLines.slice(3).filter(l => l.trim() && l.trim() !== ',').map(line => {
+    const vals = parseLine(line);
     const obj = {};
-    headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
+    headers.forEach((h, i) => { if (h) obj[h] = vals[i] ?? ''; });
     return obj;
-  });
+  }).filter(r => r['ชื่อโครงการ'] || r['ที่']);
 }
 
-// ── SVG PIE CHART ─────────────────────────────────────────────────────────────
+// ─── ACCESSORS ────────────────────────────────────────────────────────────────
+const g = (r, ...keys) => { for (const k of keys) if (r[k] !== undefined && r[k] !== '') return r[k]; return ''; };
+
+const getProject  = r => g(r, 'ชื่อโครงการ');
+const getRegion   = r => g(r, 'ภาค');
+const getSubReg   = r => g(r, 'กลุ่มจังหวัด');
+const getProvince = r => g(r, 'จังหวัด');
+const getDistrict = r => g(r, 'อำเภอ');
+const getCommunity= r => g(r, 'ชุมชน');
+const getMentor   = r => g(r, 'รายชื่อพี่เลี้ยง');
+const getStatus   = r => g(r, 'สถานะ');
+const getIssue    = r => g(r, 'ประเด็น');
+const getLat      = r => parseFloat(g(r, 'latitude')) || null;
+const getLon      = r => parseFloat(g(r, 'longtitude', 'longitude')) || null;
+const getBudget   = r => { const v = g(r, 'งบประมาณ').replace(/[฿,]/g,''); return parseInt(v)||0; };
+const getLeaders  = r => parseInt(g(r, 'จำนวนแกนนำโครงการ (คน)', 'จำนวนแกนนำ')) || 0;
+const getTargetP  = r => parseInt(g(r, 'จำนวนกลุ่มเป้าหมายเข้าร่วมโครงการ (คน)', 'จำนวนกลุ่มเป้าหมายเข้า\nร่วมโครงการ\n(คน)')) || 0;
+const getTargetG  = r => parseInt(g(r, 'จำนวนกลุ่มเป้าหมายเข้าร่วมโครงการ (กี่กลุ่มองค์กร)', 'จำนวนกลุ่มเป้า\nหมายเข้าร่วม\nโครงการ\n(กี่กลุ่มองค์กร)')) || 0;
+const getProgress = r => parseInt(g(r, 'ประเมินการดำเนินกิจกรรมของโครงการ (เปอร์เซ็นต์ %)', 'ประเมินการดำเนิน\nกิจกรรมของโครงการ\n(เปอร์เซ็นต์ %)')) || 0;
+
+// ─── SVG PIE ─────────────────────────────────────────────────────────────────
 function PieChart({ data }) {
-  const total = data.reduce((s, d) => s + d.value, 0);
-  if (!total) return null;
-  let angle = -90;
-  const slices = data.map(d => {
-    const pct = d.value / total;
-    const start = angle;
-    angle += pct * 360;
-    return { ...d, pct, start, end: angle };
-  });
-  const arc = (cx, cy, r, startDeg, endDeg) => {
-    const s = (startDeg * Math.PI) / 180;
-    const e = (endDeg * Math.PI) / 180;
-    const x1 = cx + r * Math.cos(s), y1 = cy + r * Math.sin(s);
-    const x2 = cx + r * Math.cos(e), y2 = cy + r * Math.sin(e);
-    const large = endDeg - startDeg > 180 ? 1 : 0;
-    return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
-  };
-  return (
+  const total = data.reduce((s,d)=>s+d.value,0); if(!total)return null;
+  let a = -90;
+  const slices = data.map(d=>{ const p=d.value/total,s=a; a+=p*360; return{...d,p,s,e:a}; });
+  const arc=(cx,cy,r,s,e)=>{const to=x=>(x*Math.PI)/180,x1=cx+r*Math.cos(to(s)),y1=cy+r*Math.sin(to(s)),x2=cx+r*Math.cos(to(e)),y2=cy+r*Math.sin(to(e)),lg=e-s>180?1:0;return`M${cx} ${cy}L${x1} ${y1}A${r} ${r} 0 ${lg} 1 ${x2} ${y2}Z`;};
+  return(
     <div className="flex flex-col md:flex-row items-center gap-4">
-      <svg viewBox="0 0 200 200" width="180" height="180" className="shrink-0">
-        {slices.map((s, i) => (
-          <path key={i} d={arc(100, 100, 90, s.start, s.end)} fill={REGION_COLORS[s.label] ?? '#94A3B8'} stroke="#fff" strokeWidth="2" />
-        ))}
+      <svg viewBox="0 0 200 200" width="160" height="160" className="shrink-0">
+        {slices.map((s,i)=><path key={i} d={arc(100,100,90,s.s,s.e)} fill={REGION_COLORS[s.label]??ISSUE_COLORS[i%ISSUE_COLORS.length]} stroke="#fff" strokeWidth="2"/>)}
       </svg>
-      <div className="flex flex-col gap-1.5 text-sm">
-        {slices.map((s, i) => (
+      <div className="flex flex-col gap-1.5 text-sm w-full">
+        {slices.map((s,i)=>(
           <div key={i} className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full shrink-0" style={{ background: REGION_COLORS[s.label] ?? '#94A3B8' }} />
-            <span className="text-gray-700 font-medium">{s.label}</span>
-            <span className="ml-auto font-bold text-gray-900 pl-3">{s.value}</span>
+            <span className="w-3 h-3 rounded-full shrink-0" style={{background:REGION_COLORS[s.label]??ISSUE_COLORS[i%ISSUE_COLORS.length]}}/>
+            <span className="text-gray-700 font-medium truncate flex-1">{s.label}</span>
+            <span className="font-bold text-gray-900 ml-2">{s.value}</span>
           </div>
         ))}
       </div>
@@ -76,195 +98,207 @@ function PieChart({ data }) {
   );
 }
 
-// ── SVG BAR CHART ─────────────────────────────────────────────────────────────
-function BarChart({ data }) {
-  const maxVal = Math.max(...data.flatMap(d => [d.ทดลอง ?? 0, d.รูปธรรม ?? 0])) || 1;
-  const barH = 220, barW = 48, gap = 20, groupGap = 40;
-  const total = data.length;
-  const svgW = total * (barW * 2 + gap + groupGap) + groupGap;
-  return (
+// ─── SVG BAR ──────────────────────────────────────────────────────────────────
+function BarChart({ data, keys, colors, labels }) {
+  const maxVal = Math.max(...data.flatMap(d=>keys.map(k=>d[k]??0)),1);
+  const H=180, BW=36, GAP=10, GG=30;
+  const svgW=data.length*(BW*keys.length+GAP*(keys.length-1)+GG)+GG;
+  return(
     <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${svgW} ${barH + 60}`} width="100%" style={{ minWidth: 300, maxHeight: 280 }}>
-        {data.map((d, gi) => {
-          const x = gi * (barW * 2 + gap + groupGap) + groupGap;
-          const h1 = ((d.ทดลอง ?? 0) / maxVal) * barH;
-          const h2 = ((d.รูปธรรม ?? 0) / maxVal) * barH;
-          return (
-            <g key={gi}>
-              {/* ทดลอง */}
-              <rect x={x} y={barH - h1} width={barW} height={h1} fill="#94A3B8" rx="3" />
-              <text x={x + barW / 2} y={barH - h1 - 4} textAnchor="middle" fontSize="11" fill="#475569">{d.ทดลอง ?? 0}</text>
-              {/* รูปธรรม */}
-              <rect x={x + barW + gap} y={barH - h2} width={barW} height={h2} fill="#EF4444" rx="3" />
-              <text x={x + barW + gap + barW / 2} y={barH - h2 - 4} textAnchor="middle" fontSize="11" fill="#475569">{d.รูปธรรม ?? 0}</text>
-              {/* label */}
-              <text x={x + barW + gap / 2} y={barH + 18} textAnchor="middle" fontSize="10" fill="#64748B">{d.region}</text>
-            </g>
-          );
-        })}
-        {/* legend */}
-        <rect x={groupGap} y={barH + 32} width={12} height={12} fill="#94A3B8" rx="2" />
-        <text x={groupGap + 16} y={barH + 43} fontSize="11" fill="#475569">ทดลอง</text>
-        <rect x={groupGap + 70} y={barH + 32} width={12} height={12} fill="#EF4444" rx="2" />
-        <text x={groupGap + 86} y={barH + 43} fontSize="11" fill="#475569">รูปธรรม</text>
+      <svg viewBox={`0 0 ${svgW} ${H+56}`} width="100%" style={{minWidth:260,maxHeight:260}}>
+        {data.map((d,gi)=>{ const x=gi*(BW*keys.length+GAP*(keys.length-1)+GG)+GG; return(
+          <g key={gi}>
+            {keys.map((k,ki)=>{ const h=(d[k]??0)/maxVal*H; return(
+              <g key={ki}>
+                <rect x={x+ki*(BW+GAP)} y={H-h} width={BW} height={h} fill={colors[ki]} rx="3"/>
+                {d[k]>0&&<text x={x+ki*(BW+GAP)+BW/2} y={H-h-4} textAnchor="middle" fontSize="11" fill="#475569">{d[k]}</text>}
+              </g>
+            );})}
+            <text x={x+(BW*keys.length+GAP*(keys.length-1))/2} y={H+16} textAnchor="middle" fontSize="10" fill="#64748B">{d.label}</text>
+          </g>
+        );})}
+        {keys.map((k,i)=><g key={i}>
+          <rect x={GG+i*90} y={H+28} width={12} height={12} fill={colors[i]} rx="2"/>
+          <text x={GG+i*90+16} y={H+39} fontSize="11" fill="#475569">{labels[i]}</text>
+        </g>)}
       </svg>
     </div>
   );
 }
 
-// ── KPI CARD ──────────────────────────────────────────────────────────────────
-function KPICard({ label, value, color, icon }) {
-  return (
-    <div className={`rounded-2xl p-4 text-white shadow-lg flex flex-col gap-1`} style={{ background: color }}>
-      <div className="text-2xl">{icon}</div>
-      <div className="text-3xl font-extrabold">{Number(value).toLocaleString()}</div>
+// ─── KPI CARD ─────────────────────────────────────────────────────────────────
+function KPICard({label,value,color,icon,sub}){
+  return(
+    <div className="rounded-2xl p-4 text-white shadow-lg flex flex-col gap-1 relative overflow-hidden" style={{background:color}}>
+      <div className="absolute -top-3 -right-3 text-5xl opacity-20">{icon}</div>
+      <div className="text-2xl mb-0.5">{icon}</div>
+      <div className="text-3xl font-extrabold">{typeof value==='number'?value.toLocaleString():value}</div>
       <div className="text-sm font-medium opacity-90">{label}</div>
+      {sub&&<div className="text-xs opacity-70 mt-0.5">{sub}</div>}
     </div>
   );
 }
 
-// ── MAIN PAGE ─────────────────────────────────────────────────────────────────
-const PAGES = [
-  { id: 'overview',  label: 'พี่เลี้ยง',          icon: '👥' },
-  { id: 'evaluate',  label: 'ประเมินโครงการ',      icon: '📋' },
-  { id: 'mapping',   label: 'mapping โครงการ',    icon: '🗺️' },
+// ─── STATUS BADGE ─────────────────────────────────────────────────────────────
+function Badge({text,color}){
+  return <span className="px-2 py-0.5 rounded-full text-xs font-semibold text-white whitespace-nowrap" style={{background:color}}>{text||'-'}</span>;
+}
+
+// ─── PAGES ───────────────────────────────────────────────────────────────────
+const PAGES=[
+  {id:'overview', label:'ภาพรวม',       icon:'📊'},
+  {id:'projects', label:'รายชื่อโครงการ', icon:'📁'},
+  {id:'mentors',  label:'พี่เลี้ยง',     icon:'👤'},
+  {id:'mapping',  label:'Mapping',       icon:'🗺️'},
 ];
 
+// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [regionFilter, setRegionFilter] = useState('ทั้งหมด');
-  const [activePage, setActivePage] = useState('overview');
+  const [rows,     setRows]     = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState('');
+  const [region,   setRegion]   = useState('ทั้งหมด');
+  const [province, setProvince] = useState('ทั้งหมด');
+  const [issue,    setIssue]    = useState('ทั้งหมด');
+  const [page,     setPage]     = useState('overview');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [searchProject, setSearchProject] = useState('');
+  const [search,   setSearch]   = useState('');
 
-  // ── FETCH DATA ──────────────────────────────────────────────────────────────
-  useEffect(() => {
+  // FETCH
+  useEffect(()=>{
     fetch(CSV_URL)
-      .then(r => r.text())
-      .then(text => { setRows(parseCSV(text)); setLoading(false); })
-      .catch(() => {
-        setError('ไม่สามารถโหลดข้อมูลได้ กรุณาตรวจสอบการเข้าถึง Google Sheets');
-        setLoading(false);
-      });
-  }, []);
+      .then(r=>{ if(!r.ok)throw new Error('Network error'); return r.text(); })
+      .then(t=>{ const d=parseCSV(t); setRows(d); setLoading(false); })
+      .catch(()=>{ setError('ไม่สามารถโหลดข้อมูลได้ — ตรวจสอบสิทธิ์การแชร์ Google Sheets'); setLoading(false); });
+  },[]);
 
-  // ── COMPUTED ────────────────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    if (regionFilter === 'ทั้งหมด') return rows;
-    return rows.filter(r => (r['ภาค'] || r['Region'] || '').includes(regionFilter));
-  }, [rows, regionFilter]);
+  // FILTER
+  const allProvinces = useMemo(()=>[...new Set(rows.map(getProvince).filter(Boolean))].sort(),[rows]);
+  const allIssues    = useMemo(()=>[...new Set(rows.map(getIssue).filter(Boolean))].sort(),[rows]);
 
-  // KPI
-  const col = (key, ...alts) => r => r[key] || alts.find(a => r[a]) || '';
-  const getRegion    = r => r['ภาค'] || r['Region'] || '';
-  const getType      = r => r['ประเภท'] || r['Type'] || '';
-  const getMentor    = r => r['พี่เลี้ยง'] || r['Mentor'] || '';
-  const getProject   = r => r['ชื่อโครงการ'] || r['โครงการ'] || r['Project'] || '';
-  const getLeaders   = r => parseInt(r['จำนวนแกนนำ'] || r['แกนนำ'] || 0);
-  const getTargetP   = r => parseInt(r['กลุ่มเป้าหมาย_คน'] || r['เป้าหมาย_คน'] || 0);
-  const getTargetG   = r => parseInt(r['กลุ่มเป้าหมาย_กลุ่ม'] || r['เป้าหมาย_กลุ่ม'] || 0);
+  const filtered = useMemo(()=>{
+    return rows.filter(r=>{
+      if(region!=='ทั้งหมด' && getRegion(r)!==region) return false;
+      if(province!=='ทั้งหมด' && getProvince(r)!==province) return false;
+      if(issue!=='ทั้งหมด' && getIssue(r)!==issue) return false;
+      if(search && !getProject(r).toLowerCase().includes(search.toLowerCase()) &&
+                   !getMentor(r).toLowerCase().includes(search.toLowerCase()) &&
+                   !getProvince(r).toLowerCase().includes(search.toLowerCase())) return false;
+      return true;
+    });
+  },[rows,region,province,issue,search]);
 
-  const totalProjects = filtered.length;
-  const mentors       = [...new Set(filtered.map(getMentor).filter(Boolean))];
-  const totalLeaders  = filtered.reduce((s, r) => s + getLeaders(r), 0);
-  const totalTargetP  = filtered.reduce((s, r) => s + getTargetP(r), 0);
-  const totalTargetG  = filtered.reduce((s, r) => s + getTargetG(r), 0);
+  // KPIs
+  const totalBudget  = filtered.reduce((s,r)=>s+getBudget(r),0);
+  const totalLeaders = filtered.reduce((s,r)=>s+getLeaders(r),0);
+  const totalTargetP = filtered.reduce((s,r)=>s+getTargetP(r),0);
+  const totalTargetG = filtered.reduce((s,r)=>s+getTargetG(r),0);
+  const avgProgress  = filtered.length ? Math.round(filtered.reduce((s,r)=>s+getProgress(r),0)/filtered.length) : 0;
+  const mentorSet    = [...new Set(filtered.map(getMentor).filter(Boolean))];
 
-  // Pie data
-  const pieData = REGIONS.map(reg => ({
-    label: reg,
-    value: filtered.filter(r => getRegion(r) === reg).length,
-  })).filter(d => d.value > 0);
+  // CHARTS
+  const pieRegion = REGIONS.map(reg=>({label:reg, value:filtered.filter(r=>getRegion(r)===reg).length})).filter(d=>d.value>0);
+  const pieIssue  = allIssues.slice(0,6).map(iss=>({label:iss, value:filtered.filter(r=>getIssue(r)===iss).length})).filter(d=>d.value>0);
 
-  // Bar data
-  const barData = REGIONS.map(reg => {
-    const rs = filtered.filter(r => getRegion(r) === reg);
-    return {
-      region: reg.replace('กทม.ตะวันออก', 'กทม.ตอ.').replace('กลางตะวันตก', 'กลางตต.'),
-      ทดลอง:   rs.filter(r => getType(r).includes('ทดลอง')).length,
-      รูปธรรม: rs.filter(r => getType(r).includes('รูปธรรม')).length,
-    };
-  }).filter(d => d.ทดลอง + d.รูปธรรม > 0);
+  const barRegion = REGIONS.map(reg=>{
+    const rs=filtered.filter(r=>getRegion(r)===reg);
+    return{label:reg.replace('กทม.ตะวันออก','กทม.ตอ.').replace('กลางตะวันตก','กลาง ตต.'), total:rs.length, leaders:rs.reduce((s,r)=>s+getLeaders(r),0)};
+  }).filter(d=>d.total>0);
 
-  // Projects table
-  const projectRows = filtered
-    .filter(r => getProject(r).toLowerCase().includes(searchProject.toLowerCase()))
-    .map((r, i) => ({ no: i + 1, name: getProject(r), type: getType(r), region: getRegion(r), mentor: getMentor(r) }));
-
-  // Mentor table
-  const mentorTable = [...new Set(filtered.map(getMentor).filter(Boolean))].map((m, i) => ({
-    no: i + 1, name: m,
-    region: filtered.find(r => getMentor(r) === m) ? getRegion(filtered.find(r => getMentor(r) === m)) : '',
-    projects: filtered.filter(r => getMentor(r) === m).length,
+  // Tables
+  const projectRows = filtered.map((r,i)=>({
+    no:i+1, id:g(r,'เลขที่ข้อเสนอ'), name:getProject(r), region:getRegion(r),
+    subReg:getSubReg(r), province:getProvince(r), issue:getIssue(r), status:getStatus(r),
+    budget:getBudget(r), leaders:getLeaders(r), targetP:getTargetP(r), targetG:getTargetG(r),
+    progress:getProgress(r), mentor:getMentor(r), lat:getLat(r), lon:getLon(r),
   }));
 
-  // ── RENDER ──────────────────────────────────────────────────────────────────
-  return (
-    <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
+  const mentorRows = mentorSet.map((m,i)=>{
+    const ps=filtered.filter(r=>getMentor(r)===m);
+    return{ no:i+1, name:m, region:getRegion(ps[0]||{}), count:ps.length,
+      provinces:[...new Set(ps.map(getProvince))].join(', '),
+      leaders:ps.reduce((s,r)=>s+getLeaders(r),0) };
+  });
 
-      {/* ═══ HEADER ═══ */}
+  const mapRows = projectRows.filter(r=>r.lat&&r.lon);
+
+  // STATUS COLORS
+  const statusColor=(s)=>s&&s.includes('กำลัง')?'#2563EB':s&&s.includes('เสร็จ')?'#16A34A':'#9CA3AF';
+
+  return(
+    <div className="min-h-screen flex flex-col bg-gray-50">
+
+      {/* ══ HEADER ══ */}
       <header className="bg-gradient-to-r from-[#1B3A8C] via-[#0F2663] to-[#C8102E] text-white shadow-2xl">
         <div className="max-w-screen-2xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            {/* Logos */}
+          <div className="flex items-center justify-between gap-3">
+            {/* logos */}
             <div className="flex items-center gap-2 shrink-0">
-              <div className="bg-white rounded-xl p-1 shadow-lg">
-                <Image src="/images/logo-codi.jpg" alt="CODI" width={46} height={46} className="rounded-lg object-contain" />
-              </div>
-              <div className="bg-white rounded-xl p-1 shadow-lg">
-                <Image src="/images/logo-sss.png" alt="สสส" width={46} height={46} className="rounded-lg object-contain" />
-              </div>
-              <div className="bg-white rounded-xl p-1 shadow-lg">
-                <Image src="/images/logo-sanuk6.png" alt="สำนัก 6" width={46} height={46} className="rounded-lg object-contain" />
-              </div>
+              {['logo-codi.jpg','logo-sss.png','logo-sanuk6.png'].map((f,i)=>(
+                <div key={i} className="bg-white rounded-xl p-1 shadow-lg">
+                  <Image src={`/images/${f}`} alt="" width={44} height={44} className="rounded-lg object-contain"/>
+                </div>
+              ))}
             </div>
-            {/* Title */}
-            <div className="flex-1 text-center">
-              <h1 className="text-xl md:text-2xl lg:text-3xl font-extrabold drop-shadow-lg leading-tight">
+            {/* title */}
+            <div className="flex-1 text-center min-w-0">
+              <h1 className="text-lg md:text-2xl font-extrabold drop-shadow-lg leading-tight truncate">
                 คนรุ่นใหม่คืนถิ่น MOVEMENT คนรุ่นใหม่3
               </h1>
-              <p className="text-xs md:text-sm opacity-80 mt-0.5">รายงานสรุปผลการดำเนินงาน · สำนัก 6 สสส.</p>
+              <p className="text-xs md:text-sm opacity-80">รายงานสรุปผลการดำเนินงาน · สำนัก 6 สสส.</p>
             </div>
-            {/* Characters */}
+            {/* characters */}
             <div className="hidden lg:flex items-end gap-1 shrink-0">
-              {[1,2,3,4].map(n => (
-                <Image key={n} src={`/images/char${n}.png`} alt="" width={52} height={60}
+              {[1,2,3,4].map(n=>(
+                <Image key={n} src={`/images/char${n}.png`} alt="" width={50} height={58}
                   className="object-contain drop-shadow-xl"
-                  style={{ animation: `float${n%2===0?'2':''} ${3.5+n*0.4}s ease-in-out infinite` }}
-                />
+                  style={{animation:`float${n%2===0?'2':''} ${3.5+n*0.5}s ease-in-out infinite`}}/>
               ))}
             </div>
           </div>
 
-          {/* Nav tabs */}
-          <div className="mt-3 flex items-center gap-2">
-            <div className="hidden md:flex gap-2">
-              {PAGES.map(p => (
-                <button key={p.id} onClick={() => setActivePage(p.id)}
-                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-all
-                    ${activePage===p.id ? 'bg-white text-[#1B3A8C] shadow-md scale-105' : 'bg-white/20 hover:bg-white/30'}`}>
+          {/* NAV + FILTERS */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="hidden md:flex gap-1.5">
+              {PAGES.map(p=>(
+                <button key={p.id} onClick={()=>setPage(p.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all
+                    ${page===p.id?'bg-white text-[#1B3A8C] shadow-md scale-105':'bg-white/20 hover:bg-white/30'}`}>
                   {p.icon} {p.label}
                 </button>
               ))}
             </div>
-            {/* Region filter */}
-            <div className="ml-auto">
-              <select value={regionFilter} onChange={e=>setRegionFilter(e.target.value)}
-                className="bg-white/20 border border-white/30 text-white rounded-full px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-white/50">
+            <div className="flex-1 flex flex-wrap gap-2 md:justify-end">
+              {/* Region filter */}
+              <select value={region} onChange={e=>{setRegion(e.target.value);setProvince('ทั้งหมด');}}
+                className="bg-white/20 border border-white/30 text-white rounded-full px-3 py-1 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-white/40">
                 <option value="ทั้งหมด" className="text-gray-900">🌏 ทุกภาค</option>
-                {REGIONS.map(r => <option key={r} value={r} className="text-gray-900">{r}</option>)}
+                {REGIONS.map(r=><option key={r} value={r} className="text-gray-900">{r}</option>)}
               </select>
+              {/* Province filter */}
+              <select value={province} onChange={e=>setProvince(e.target.value)}
+                className="bg-white/20 border border-white/30 text-white rounded-full px-3 py-1 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-white/40">
+                <option value="ทั้งหมด" className="text-gray-900">📍 ทุกจังหวัด</option>
+                {allProvinces.map(p=><option key={p} value={p} className="text-gray-900">{p}</option>)}
+              </select>
+              {/* Issue filter */}
+              <select value={issue} onChange={e=>setIssue(e.target.value)}
+                className="bg-white/20 border border-white/30 text-white rounded-full px-3 py-1 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-white/40">
+                <option value="ทั้งหมด" className="text-gray-900">📌 ทุกประเด็น</option>
+                {allIssues.map(i=><option key={i} value={i} className="text-gray-900">{i}</option>)}
+              </select>
+              {/* Search */}
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 ค้นหา..."
+                className="bg-white/20 border border-white/30 text-white placeholder-white/60 rounded-full px-3 py-1 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-white/40 w-32 md:w-40"/>
             </div>
-            {/* Mobile menu */}
-            <button className="md:hidden bg-white/20 rounded-full px-3 py-1.5 text-sm" onClick={()=>setMenuOpen(!menuOpen)}>☰</button>
+            <button className="md:hidden bg-white/20 rounded-full px-3 py-1.5 text-xs" onClick={()=>setMenuOpen(!menuOpen)}>☰</button>
           </div>
-          {menuOpen && (
+
+          {menuOpen&&(
             <div className="md:hidden mt-2 flex flex-col gap-1 pb-2">
-              {PAGES.map(p => (
-                <button key={p.id} onClick={()=>{setActivePage(p.id);setMenuOpen(false)}}
-                  className={`text-left px-4 py-2 rounded-lg text-sm font-semibold ${activePage===p.id?'bg-white text-[#1B3A8C]':'bg-white/20'}`}>
+              {PAGES.map(p=>(
+                <button key={p.id} onClick={()=>{setPage(p.id);setMenuOpen(false)}}
+                  className={`text-left px-4 py-2 rounded-lg text-sm font-semibold ${page===p.id?'bg-white text-[#1B3A8C]':'bg-white/20'}`}>
                   {p.icon} {p.label}
                 </button>
               ))}
@@ -273,195 +307,276 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* ═══ MAIN ═══ */}
-      <main className="flex-1 max-w-screen-2xl mx-auto w-full px-4 py-6 space-y-6">
+      {/* ══ MAIN ══ */}
+      <main className="flex-1 max-w-screen-2xl mx-auto w-full px-4 py-5 space-y-5">
 
-        {loading && (
+        {/* Loading */}
+        {loading&&(
           <div className="flex justify-center items-center h-64">
             <div className="text-center">
               <div className="animate-spin text-5xl mb-3">⏳</div>
-              <p className="text-gray-500 font-medium">กำลังโหลดข้อมูล...</p>
+              <p className="text-gray-500 font-medium">กำลังโหลดข้อมูลจาก Google Sheets...</p>
             </div>
           </div>
         )}
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
-            <p className="text-red-600 font-medium">{error}</p>
-            <p className="text-sm text-gray-500 mt-2">ต้องเข้าสู่ระบบ Google หรือตรวจสอบสิทธิ์การแชร์ Google Sheets</p>
+        {/* Error */}
+        {error&&!loading&&(
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-6 text-center">
+            <p className="text-amber-700 font-semibold text-lg">⚠️ {error}</p>
+            <p className="text-sm text-gray-500 mt-2">กรุณาแชร์ Google Sheets เป็น "ทุกคนที่มีลิ้งค์" (ผู้ดู) แล้วรีเฟรชหน้าเว็บ</p>
           </div>
         )}
 
-        {!loading && !error && activePage === 'overview' && (
+        {!loading&&!error&&(
           <>
-            {/* KPI CARDS */}
-            <section>
-              <h2 className="text-lg font-bold text-gray-800 mb-3">📊 ภาพรวม {regionFilter !== 'ทั้งหมด' && <span className="text-[#1B3A8C]">— {regionFilter}</span>}</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                <KPICard label="จำนวนโครงการ" value={totalProjects} color="#D97706" icon="📁" />
-                <KPICard label="แกนนำคนรุ่นใหม่" value={totalLeaders || 403} color="#F97316" icon="🌱" />
-                <KPICard label="จำนวนพี่เลี้ยง" value={mentors.length || 28} color="#0F766E" icon="👤" />
-                <KPICard label="กลุ่มเป้าหมาย (คน)" value={totalTargetP || 2077} color="#1D4ED8" icon="👥" />
-                <KPICard label="กลุ่มเป้าหมาย (กลุ่ม)" value={totalTargetG || 130} color="#7C3AED" icon="🏘️" />
-              </div>
-            </section>
+            {/* ── OVERVIEW ── */}
+            {page==='overview'&&(
+              <>
+                {/* KPI row */}
+                <section>
+                  <h2 className="text-base font-bold text-gray-700 mb-3">
+                    📊 ภาพรวมโครงการ
+                    {region!=='ทั้งหมด'&&<span className="text-[#1B3A8C] ml-2">— {region}</span>}
+                    {province!=='ทั้งหมด'&&<span className="text-[#C8102E] ml-2">— {province}</span>}
+                  </h2>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <KPICard label="โครงการทั้งหมด"    value={filtered.length}  color="#D97706" icon="📁"/>
+                    <KPICard label="แกนนำคนรุ่นใหม่"   value={totalLeaders}     color="#F97316" icon="🌱"/>
+                    <KPICard label="พี่เลี้ยง"          value={mentorSet.length} color="#0F766E" icon="👤"/>
+                    <KPICard label="กลุ่มเป้าหมาย (คน)" value={totalTargetP}    color="#1D4ED8" icon="👥"/>
+                    <KPICard label="กลุ่มเป้าหมาย (กลุ่ม)" value={totalTargetG} color="#7C3AED" icon="🏘️"/>
+                    <KPICard label="งบประมาณรวม"        value={`฿${(totalBudget/1000000).toFixed(1)}M`} color="#BE185D" icon="💰"
+                      sub={`เฉลี่ย ฿${filtered.length?Math.round(totalBudget/filtered.length/1000).toLocaleString():0}K/โครงการ`}/>
+                  </div>
+                </section>
 
-            {/* CHARTS ROW */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Pie chart */}
-              <div className="bg-white rounded-2xl shadow-md p-5">
-                <h3 className="font-bold text-gray-800 mb-4">🥧 แบ่งตามภาค ({regionFilter==='ทั้งหมด'?'ทุกภาค':regionFilter})</h3>
-                {pieData.length > 0
-                  ? <PieChart data={pieData} />
-                  : <p className="text-gray-400 text-center py-10">ไม่มีข้อมูล</p>}
-              </div>
+                {/* Progress bar */}
+                {avgProgress>0&&(
+                  <div className="bg-white rounded-2xl shadow p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-bold text-gray-700">⏱️ ความคืบหน้าเฉลี่ยโครงการ</span>
+                      <span className="text-lg font-extrabold text-[#1B3A8C]">{avgProgress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4">
+                      <div className="h-4 rounded-full transition-all" style={{width:`${avgProgress}%`,background:'linear-gradient(90deg,#1B3A8C,#C8102E)'}}/>
+                    </div>
+                  </div>
+                )}
 
-              {/* Bar chart */}
-              <div className="bg-white rounded-2xl shadow-md p-5">
-                <h3 className="font-bold text-gray-800 mb-4">📊 จำนวนโครงการ ทดลอง vs รูปธรรม แยกภาค</h3>
-                {barData.length > 0
-                  ? <BarChart data={barData} />
-                  : <p className="text-gray-400 text-center py-10">ไม่มีข้อมูล</p>}
-              </div>
-            </div>
+                {/* Charts */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {/* Pie: Region */}
+                  <div className="bg-white rounded-2xl shadow p-5">
+                    <h3 className="font-bold text-gray-800 mb-4">🥧 จำนวนโครงการแบ่งตามภาค</h3>
+                    {pieRegion.length>0?<PieChart data={pieRegion}/>:<p className="text-gray-400 text-center py-8">ไม่มีข้อมูล</p>}
+                  </div>
+                  {/* Pie: Issue */}
+                  <div className="bg-white rounded-2xl shadow p-5">
+                    <h3 className="font-bold text-gray-800 mb-4">📌 จำนวนโครงการแบ่งตามประเด็น</h3>
+                    {pieIssue.length>0?<PieChart data={pieIssue}/>:<p className="text-gray-400 text-center py-8">ไม่มีข้อมูล</p>}
+                  </div>
+                </div>
 
-            {/* MENTOR TABLE */}
-            <div className="bg-white rounded-2xl shadow-md p-5">
-              <h3 className="font-bold text-gray-800 mb-4">👤 รายชื่อพี่เลี้ยง ({mentorTable.length} คน)</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-[#1B3A8C] text-white">
-                      <th className="px-3 py-2 text-left rounded-tl-lg w-12">ที่</th>
-                      <th className="px-3 py-2 text-left">พี่เลี้ยง</th>
-                      <th className="px-3 py-2 text-left">ภาค</th>
-                      <th className="px-3 py-2 text-right rounded-tr-lg">โครงการ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mentorTable.map((m, i) => (
-                      <tr key={i} className={i%2===0?'bg-gray-50':'bg-white'}>
-                        <td className="px-3 py-2 text-gray-500">{m.no}</td>
-                        <td className="px-3 py-2 font-medium">{m.name}</td>
-                        <td className="px-3 py-2">
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                            style={{ background: REGION_COLORS[m.region] ?? '#94A3B8' }}>
-                            {m.region}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-right font-bold text-[#1B3A8C]">{m.projects}</td>
+                {/* Bar */}
+                <div className="bg-white rounded-2xl shadow p-5">
+                  <h3 className="font-bold text-gray-800 mb-4">📊 โครงการและแกนนำ แยกตามภาค</h3>
+                  {barRegion.length>0?
+                    <BarChart data={barRegion} keys={['total','leaders']} colors={['#1B3A8C','#F97316']} labels={['โครงการ','แกนนำ (คน)']}/>
+                    :<p className="text-gray-400 text-center py-8">ไม่มีข้อมูล</p>}
+                </div>
+
+                {/* Province summary */}
+                <div className="bg-white rounded-2xl shadow p-5">
+                  <h3 className="font-bold text-gray-800 mb-4">📍 สรุปตามจังหวัด</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-[#1B3A8C] text-white">
+                          {['จังหวัด','ภาค','โครงการ','แกนนำ (คน)','งบประมาณ'].map(h=><th key={h} className="px-3 py-2 text-left">{h}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...new Set(filtered.map(getProvince))].filter(Boolean).sort().map((prov,i)=>{
+                          const ps=filtered.filter(r=>getProvince(r)===prov);
+                          const reg=getRegion(ps[0]||{});
+                          return(
+                            <tr key={i} className={i%2===0?'bg-gray-50':'bg-white'}>
+                              <td className="px-3 py-2 font-medium">{prov}</td>
+                              <td className="px-3 py-2"><Badge text={reg} color={REGION_COLORS[reg]??'#94A3B8'}/></td>
+                              <td className="px-3 py-2 font-bold text-[#1B3A8C]">{ps.length}</td>
+                              <td className="px-3 py-2 font-bold text-[#F97316]">{ps.reduce((s,r)=>s+getLeaders(r),0)}</td>
+                              <td className="px-3 py-2 text-gray-600">฿{(ps.reduce((s,r)=>s+getBudget(r),0)/1000).toLocaleString()}K</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ── PROJECTS PAGE ── */}
+            {page==='projects'&&(
+              <div className="bg-white rounded-2xl shadow p-5">
+                <h3 className="font-bold text-gray-800 mb-4">📁 รายชื่อโครงการ ({projectRows.length} โครงการ)</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-[#C8102E] text-white">
+                        {['ที่','ชื่อโครงการ','ภาค','จังหวัด','ประเด็น','สถานะ','แกนนำ','เป้าหมาย','ความคืบหน้า','พี่เลี้ยง','งบประมาณ'].map(h=>(
+                          <th key={h} className="px-2 py-2 text-left whitespace-nowrap">{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                    {mentorTable.length === 0 && (
-                      <tr><td colSpan="4" className="text-center py-8 text-gray-400">ไม่พบข้อมูลพี่เลี้ยง</td></tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {projectRows.map((p,i)=>(
+                        <tr key={i} className={`${i%2===0?'bg-gray-50':'bg-white'} hover:bg-blue-50 transition-colors`}>
+                          <td className="px-2 py-2 text-gray-400 text-center">{p.no}</td>
+                          <td className="px-2 py-2 font-medium max-w-xs">
+                            <div className="truncate" title={p.name}>{p.name}</div>
+                            {p.subReg&&<div className="text-xs text-gray-400">{p.subReg}</div>}
+                          </td>
+                          <td className="px-2 py-2"><Badge text={p.region} color={REGION_COLORS[p.region]??'#94A3B8'}/></td>
+                          <td className="px-2 py-2 text-gray-600 whitespace-nowrap">{p.province}</td>
+                          <td className="px-2 py-2 max-w-[120px]"><div className="truncate text-xs" title={p.issue}>{p.issue}</div></td>
+                          <td className="px-2 py-2"><Badge text={p.status} color={statusColor(p.status)}/></td>
+                          <td className="px-2 py-2 text-center font-bold text-[#F97316]">{p.leaders||'-'}</td>
+                          <td className="px-2 py-2 text-center font-bold text-[#1D4ED8]">{p.targetP||'-'}</td>
+                          <td className="px-2 py-2">
+                            {p.progress>0&&(
+                              <div className="flex items-center gap-1">
+                                <div className="flex-1 bg-gray-200 rounded h-2">
+                                  <div className="h-2 rounded" style={{width:`${Math.min(p.progress,100)}%`,background:'#1B3A8C'}}/>
+                                </div>
+                                <span className="text-xs font-bold text-gray-600">{p.progress}%</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-2 py-2 text-gray-600 text-xs whitespace-nowrap">{p.mentor}</td>
+                          <td className="px-2 py-2 text-right text-xs text-gray-500 whitespace-nowrap">{p.budget?`฿${(p.budget/1000).toLocaleString()}K`:'-'}</td>
+                        </tr>
+                      ))}
+                      {projectRows.length===0&&<tr><td colSpan="11" className="text-center py-10 text-gray-400">ไม่พบโครงการ</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* PROJECT TABLE */}
-            <div className="bg-white rounded-2xl shadow-md p-5">
-              <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
-                <h3 className="font-bold text-gray-800">📁 รายชื่อโครงการ ({projectRows.length} โครงการ)</h3>
-                <input placeholder="🔍 ค้นหาโครงการ..." value={searchProject}
-                  onChange={e=>setSearchProject(e.target.value)}
-                  className="md:ml-auto border border-gray-200 rounded-full px-4 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B3A8C]/30 w-full md:w-64"/>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-[#C8102E] text-white">
-                      <th className="px-3 py-2 text-left rounded-tl-lg w-12">ที่</th>
-                      <th className="px-3 py-2 text-left">ชื่อโครงการ</th>
-                      <th className="px-3 py-2 text-left">ประเภท</th>
-                      <th className="px-3 py-2 text-left">ภาค</th>
-                      <th className="px-3 py-2 text-left rounded-tr-lg">พี่เลี้ยง</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {projectRows.map((p, i) => (
-                      <tr key={i} className={i%2===0?'bg-gray-50 hover:bg-blue-50':'bg-white hover:bg-blue-50'} style={{transition:'background 0.15s'}}>
-                        <td className="px-3 py-2 text-gray-500">{p.no}</td>
-                        <td className="px-3 py-2 font-medium max-w-xs truncate" title={p.name}>{p.name}</td>
-                        <td className="px-3 py-2">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold text-white`}
-                            style={{ background: TYPE_COLORS[p.type] ?? '#94A3B8' }}>
-                            {p.type}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                            style={{ background: REGION_COLORS[p.region] ?? '#94A3B8' }}>
-                            {p.region}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-gray-600">{p.mentor}</td>
+            {/* ── MENTORS PAGE ── */}
+            {page==='mentors'&&(
+              <div className="bg-white rounded-2xl shadow p-5">
+                <h3 className="font-bold text-gray-800 mb-4">👤 รายชื่อพี่เลี้ยง ({mentorRows.length} คน)</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-[#0F766E] text-white">
+                        {['ที่','รายชื่อพี่เลี้ยง','ภาค','จังหวัดที่รับผิดชอบ','โครงการ','แกนนำรวม'].map(h=>(
+                          <th key={h} className="px-3 py-2 text-left">{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                    {projectRows.length === 0 && (
-                      <tr><td colSpan="5" className="text-center py-8 text-gray-400">ไม่พบโครงการ</td></tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {mentorRows.map((m,i)=>(
+                        <tr key={i} className={i%2===0?'bg-gray-50':'bg-white'}>
+                          <td className="px-3 py-2 text-gray-400 text-center">{m.no}</td>
+                          <td className="px-3 py-2 font-semibold text-gray-800">{m.name}</td>
+                          <td className="px-3 py-2"><Badge text={m.region} color={REGION_COLORS[m.region]??'#94A3B8'}/></td>
+                          <td className="px-3 py-2 text-gray-600 text-xs">{m.provinces}</td>
+                          <td className="px-3 py-2 text-center font-bold text-[#1B3A8C]">{m.count}</td>
+                          <td className="px-3 py-2 text-center font-bold text-[#F97316]">{m.leaders||'-'}</td>
+                        </tr>
+                      ))}
+                      {mentorRows.length===0&&<tr><td colSpan="6" className="text-center py-10 text-gray-400">ไม่พบข้อมูลพี่เลี้ยง</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* ── MAPPING PAGE ── */}
+            {page==='mapping'&&(
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {REGIONS.map(reg=>{
+                    const cnt=filtered.filter(r=>getRegion(r)===reg).length;
+                    return(
+                      <div key={reg} className="rounded-xl text-white p-3 shadow text-center" style={{background:REGION_COLORS[reg]}}>
+                        <div className="text-2xl font-extrabold">{cnt}</div>
+                        <div className="text-sm font-medium opacity-90">{reg}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Cards by region */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {REGIONS.map(reg=>{
+                    const ps=filtered.filter(r=>getRegion(r)===reg);
+                    if(!ps.length)return null;
+                    return(
+                      <div key={reg} className="bg-white rounded-2xl shadow overflow-hidden">
+                        <div className="px-4 py-3 text-white font-bold flex justify-between items-center" style={{background:REGION_COLORS[reg]}}>
+                          <span>{reg}</span><span className="bg-white/20 rounded-full px-2 py-0.5 text-sm">{ps.length}</span>
+                        </div>
+                        <ul className="p-3 space-y-2 max-h-64 overflow-y-auto">
+                          {ps.map((r,i)=>{
+                            const lat=getLat(r), lon=getLon(r);
+                            return(
+                              <li key={i} className="text-xs text-gray-700 border-b border-gray-100 pb-1.5 last:border-0">
+                                <div className="font-medium truncate" title={getProject(r)}>{i+1}. {getProject(r)}</div>
+                                <div className="text-gray-400 mt-0.5 flex items-center gap-2">
+                                  <span>📍 {getProvince(r)} — {getDistrict(r)}</span>
+                                  {lat&&lon&&<a href={`https://maps.google.com/?q=${lat},${lon}`} target="_blank" rel="noreferrer" className="text-blue-500 underline">แผนที่</a>}
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Location table */}
+                {mapRows.length>0&&(
+                  <div className="bg-white rounded-2xl shadow p-5">
+                    <h3 className="font-bold text-gray-800 mb-3">📌 โครงการที่มีพิกัด ({mapRows.length} โครงการ)</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead><tr className="bg-gray-100">
+                          {['ชื่อโครงการ','จังหวัด','อำเภอ','Latitude','Longitude','Google Maps'].map(h=><th key={h} className="px-2 py-1.5 text-left">{h}</th>)}
+                        </tr></thead>
+                        <tbody>
+                          {mapRows.map((r,i)=>(
+                            <tr key={i} className={i%2===0?'bg-gray-50':'bg-white'}>
+                              <td className="px-2 py-1.5 max-w-xs truncate" title={r.name}>{r.name}</td>
+                              <td className="px-2 py-1.5">{r.province}</td>
+                              <td className="px-2 py-1.5">{projectRows[i]?.district||'-'}</td>
+                              <td className="px-2 py-1.5 font-mono">{r.lat}</td>
+                              <td className="px-2 py-1.5 font-mono">{r.lon}</td>
+                              <td className="px-2 py-1.5">
+                                <a href={`https://maps.google.com/?q=${r.lat},${r.lon}`} target="_blank" rel="noreferrer"
+                                  className="bg-[#1B3A8C] text-white rounded px-2 py-0.5 hover:bg-[#0F2663] transition-colors">
+                                  📍 ดูแผนที่
+                                </a>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
-
-        {/* ─── EVALUATE PAGE ─── */}
-        {!loading && !error && activePage === 'evaluate' && (
-          <div className="bg-white rounded-2xl shadow-md p-8 text-center">
-            <div className="text-6xl mb-4">📋</div>
-            <h2 className="text-xl font-bold text-gray-800 mb-2">ประเมินโครงการ</h2>
-            <p className="text-gray-500">หน้านี้แสดงผลการประเมินโครงการ — กำลังพัฒนา</p>
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {['ทดลอง', 'รูปธรรม', 'ทั้งหมด'].map(type => {
-                const count = type === 'ทั้งหมด' ? filtered.length : filtered.filter(r => getType(r) === type).length;
-                return (
-                  <div key={type} className="bg-gray-50 rounded-xl p-4">
-                    <div className="text-2xl font-bold text-[#1B3A8C]">{count}</div>
-                    <div className="text-sm text-gray-600 mt-1">โครงการ{type !== 'ทั้งหมด' ? `ประเภท ${type}` : ''}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ─── MAPPING PAGE ─── */}
-        {!loading && !error && activePage === 'mapping' && (
-          <div className="bg-white rounded-2xl shadow-md p-5">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">🗺️ Mapping โครงการแยกภาค</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {REGIONS.map(reg => {
-                const regProjects = filtered.filter(r => getRegion(r) === reg);
-                if (!regProjects.length) return null;
-                return (
-                  <div key={reg} className="rounded-xl border-2 overflow-hidden"
-                    style={{ borderColor: REGION_COLORS[reg] ?? '#94A3B8' }}>
-                    <div className="px-4 py-2 text-white font-bold text-sm"
-                      style={{ background: REGION_COLORS[reg] ?? '#94A3B8' }}>
-                      {reg} ({regProjects.length} โครงการ)
-                    </div>
-                    <ul className="p-3 space-y-1 max-h-48 overflow-y-auto">
-                      {regProjects.map((r, i) => (
-                        <li key={i} className="text-xs text-gray-700 flex gap-2">
-                          <span className="shrink-0 text-gray-400">{i+1}.</span>
-                          <span className="truncate" title={getProject(r)}>{getProject(r)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
       </main>
 
-      {/* ═══ FOOTER ═══ */}
+      {/* ══ FOOTER ══ */}
       <footer className="bg-[#1B3A8C] text-white py-3 text-center text-xs opacity-90">
         © 2024 สถาบันพัฒนาองค์กรชุมชน (CODI) · สำนักงานกองทุนสนับสนุนการสร้างเสริมสุขภาพ (สสส.) · Movement คนรุ่นใหม่คืนถิ่น
       </footer>
