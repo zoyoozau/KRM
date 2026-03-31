@@ -18,40 +18,53 @@ const REGION_COLORS = {
 const ISSUE_COLORS = ['#6366F1','#EC4899','#14B8A6','#F59E0B','#84CC16','#06B6D4','#8B5CF6'];
 const REGIONS = Object.keys(REGION_COLORS);
 
-// ─── CSV PARSER ───────────────────────────────────────────────────────────────
-// Sheets format: row1=title, row2=section headers (merged), row3=column headers, row4+=data
+// ─── CSV PARSER (รองรับ multi-line quoted cells) ──────────────────────────────
+// Sheets format: row1=title, row2=section headers, row3=column headers, row4+=data
 function parseCSV(text) {
-  const rawLines = text.split('\n').map(l => l.replace(/\r$/, ''));
-  if (rawLines.length < 4) return [];
-
-  // Parse a single CSV line handling quoted fields
-  const parseLine = (line) => {
-    const fields = [];
-    let cur = '', inQ = false;
-    for (const ch of line) {
-      if (ch === '"') { inQ = !inQ; }
-      else if (ch === ',' && !inQ) { fields.push(cur); cur = ''; }
-      else { cur += ch; }
+  // Full CSV tokeniser that handles newlines inside quoted cells
+  function tokenise(src) {
+    const rows = [];
+    let row = [], cur = '', inQ = false, i = 0;
+    while (i < src.length) {
+      const ch = src[i];
+      if (ch === '"') {
+        if (inQ && src[i+1] === '"') { cur += '"'; i += 2; continue; } // escaped quote
+        inQ = !inQ; i++; continue;
+      }
+      if (ch === ',' && !inQ) { row.push(cur); cur = ''; i++; continue; }
+      if ((ch === '\n' || ch === '\r') && !inQ) {
+        if (ch === '\r' && src[i+1] === '\n') i++;
+        row.push(cur); rows.push(row); row = []; cur = ''; i++; continue;
+      }
+      cur += ch; i++;
     }
-    fields.push(cur);
-    return fields.map(f => f.trim());
-  };
+    if (cur || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
 
-  // Row 3 (index 2) = headers
-  const headers = parseLine(rawLines[2]).map(h =>
-    h.replace(/^["']|["']$/g, '')   // remove quotes
-     .replace(/^#\s*/, '')          // remove # prefix (number type indicator)
-     .replace(/\n/g, ' ')           // collapse newlines
-     .trim()
-  );
+  const rows = tokenise(text);
+  if (rows.length < 4) return [];
 
-  // Row 4+ = data
-  return rawLines.slice(3).filter(l => l.trim() && l.trim() !== ',').map(line => {
-    const vals = parseLine(line);
-    const obj = {};
-    headers.forEach((h, i) => { if (h) obj[h] = vals[i] ?? ''; });
-    return obj;
-  }).filter(r => r['ชื่อโครงการ'] || r['ที่']);
+  // Row index 2 = actual column headers (row 3 in Sheets)
+  const clean = s => s.replace(/^#\s*/, '').replace(/\n/g,' ').trim();
+  const headers = rows[2].map(clean);
+
+  // Row index 3+ = data; keep only rows where ภาค is a valid region
+  const VALID_REGIONS = ['ภาคเหนือ','ใต้','ภาคอีสาน','กทม.ตะวันออก','กลางตะวันตก'];
+  const regionIdx = headers.indexOf('ภาค');
+
+  return rows.slice(3)
+    .filter(vals => {
+      const name  = (vals[headers.indexOf('ชื่อโครงการ')] ?? '').trim();
+      const reg   = regionIdx >= 0 ? (vals[regionIdx] ?? '').trim() : '';
+      // ตัดแถวที่ไม่มีชื่อโครงการ หรือภาคไม่ใช่ 5 ภาคหลัก
+      return name && VALID_REGIONS.includes(reg);
+    })
+    .map(vals => {
+      const obj = {};
+      headers.forEach((h, i) => { if (h) obj[h] = (vals[i] ?? '').trim(); });
+      return obj;
+    });
 }
 
 // ─── ACCESSORS ────────────────────────────────────────────────────────────────
