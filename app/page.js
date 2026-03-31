@@ -247,7 +247,7 @@ function ProgressHistogram({data}){
         {/* Baseline */}
         <line x1={PL-4} y1={H} x2={totalW} y2={H} stroke="#9ca3af" strokeWidth="1.5"/>
       </svg>
-    </div>  {/* /max-w-[560px] */}
+    </div>
   );
 }
 
