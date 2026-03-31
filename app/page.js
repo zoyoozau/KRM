@@ -67,8 +67,9 @@ const getRowNo    =r=>g(r,'ที่');
 const getProjectType=budget=>budget>0&&budget<=70000?'ทดลอง':budget>70000?'รูปธรรม':'-';
 const TYPE_COLOR={'ทดลอง':'#F97316','รูปธรรม':'#1B3A8C'};
 
-// PIE CHART with numbers inside slices
-function PieChart({data,size=200}){
+// PIE CHART — interactive: hover tooltip + click to filter
+function PieChart({data,size=200,onSliceClick,activeRegion}){
+  const[hovered,setHovered]=useState(null);
   const total=data.reduce((s,d)=>s+d.value,0);
   if(!total)return null;
   let a=-90;
@@ -76,21 +77,69 @@ function PieChart({data,size=200}){
   const cx=100,cy=100,r=92;
   const rad=x=>x*Math.PI/180;
   const pt=(angle,radius)=>[cx+radius*Math.cos(rad(angle)),cy+radius*Math.sin(rad(angle))];
-  const arc=(s,e)=>{const[x1,y1]=pt(s,r),[x2,y2]=pt(e,r);const lg=e-s>180?1:0;return`M${cx} ${cy}L${x1} ${y1}A${r} ${r} 0 ${lg} 1 ${x2} ${y2}Z`;};
-  const cen=(s,e)=>pt((s+e)/2,r*0.62);
+
+  // arc path — rOuter can vary for "explode" effect
+  const arc=(s,e,rOut)=>{
+    const[x1,y1]=pt(s,rOut),[x2,y2]=pt(e,rOut);
+    const lg=e-s>180?1:0;
+    return`M${cx} ${cy}L${x1} ${y1}A${rOut} ${rOut} 0 ${lg} 1 ${x2} ${y2}Z`;
+  };
+  const cen=(s,e,rOut)=>pt((s+e)/2,rOut*0.62);
+
+  const hoveredSlice=hovered!==null?slices[hovered]:null;
+
   return(
-    <svg viewBox="0 0 200 200" width={size} height={size}>
-      {slices.map((sl,i)=>{
-        const color=REGION_COLORS[sl.label]??ISSUE_COLORS[i%ISSUE_COLORS.length];
-        const[tx,ty]=cen(sl.s,sl.e);
-        return(
-          <g key={i}>
-            <path d={arc(sl.s,sl.e)} fill={color} stroke="#fff" strokeWidth="2"/>
-            {sl.p>0.035&&<text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fontSize="14" fontWeight="800" fill="white">{sl.value}</text>}
-          </g>
-        );
-      })}
-    </svg>
+    <div className="relative flex flex-col items-center">
+      {/* Tooltip */}
+      <div className={`mb-1 h-7 flex items-center justify-center transition-all duration-150 ${hoveredSlice?'opacity-100':'opacity-0'}`}>
+        {hoveredSlice&&(
+          <div className="px-3 py-1 rounded-full text-white text-xs font-bold shadow-lg whitespace-nowrap"
+            style={{background:REGION_COLORS[hoveredSlice.label]??'#333'}}>
+            {hoveredSlice.label} · {hoveredSlice.value} โครงการ ({Math.round(hoveredSlice.p*100)}%)
+          </div>
+        )}
+      </div>
+
+      <svg viewBox="0 0 200 200" width={size} height={size} style={{overflow:'visible'}}>
+        {slices.map((sl,i)=>{
+          const color=REGION_COLORS[sl.label]??ISSUE_COLORS[i%ISSUE_COLORS.length];
+          const isActive=activeRegion&&sl.label===activeRegion;
+          const isHov=hovered===i;
+          const rOut=isActive||isHov?98:92; // explode outward on hover/active
+          const[tx,ty]=cen(sl.s,sl.e,rOut);
+          return(
+            <g key={i} style={{cursor:'pointer',transition:'all 0.15s'}}
+              onMouseEnter={()=>setHovered(i)}
+              onMouseLeave={()=>setHovered(null)}
+              onClick={()=>onSliceClick&&onSliceClick(sl.label)}>
+              <path d={arc(sl.s,sl.e,rOut)} fill={color}
+                stroke={isActive?'#fff':'#fff'}
+                strokeWidth={isActive?3:2}
+                opacity={activeRegion&&!isActive?0.55:1}
+                style={{filter:isHov?'brightness(1.15)':'none'}}/>
+              {sl.p>0.035&&(
+                <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle"
+                  fontSize={isActive||isHov?15:14} fontWeight="800" fill="white"
+                  style={{pointerEvents:'none'}}>
+                  {sl.value}
+                </text>
+              )}
+            </g>
+          );
+        })}
+        {/* active ring indicator */}
+        {activeRegion&&slices.find(s=>s.label===activeRegion)&&(()=>{
+          const sl=slices.find(s=>s.label===activeRegion);
+          const color=REGION_COLORS[sl.label]??'#333';
+          return<circle cx={cx} cy={cy} r={4} fill={color} stroke="#fff" strokeWidth="1.5"/>;
+        })()}
+      </svg>
+
+      {/* "คลิกเพื่อกรอง" hint */}
+      <p className="text-xs text-gray-400 mt-1 text-center">
+        {activeRegion?<span className="text-[#1B3A8C] font-semibold cursor-pointer" onClick={()=>onSliceClick&&onSliceClick(activeRegion)}>✕ ยกเลิกกรอง {activeRegion}</span>:'คลิกชิ้นเพื่อกรองข้อมูล'}
+      </p>
+    </div>
   );
 }
 
@@ -315,7 +364,12 @@ export default function Dashboard(){
                     </div>
                     <p className="text-sm font-bold text-gray-700">แบ่งภาค</p>
                     <div className="flex justify-center">
-                      <PieChart data={pieRegion} size={200}/>
+                      <PieChart
+                        data={pieRegion}
+                        size={200}
+                        activeRegion={region!=='ทั้งหมด'?region:null}
+                        onSliceClick={label=>changeRegion(region===label?'ทั้งหมด':label)}
+                      />
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-1">
                       {REGIONS.filter(reg=>pieRegion.some(p=>p.label===reg)).map(reg=>(
