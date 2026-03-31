@@ -197,6 +197,57 @@ function TypeBarChart({data,globalMax=1,onBarClick,activeRegion}){
   );
 }
 
+// สีตามเปอร์เซ็นต์ความก้าวหน้า (แดง→เขียว)
+const PROG_COLORS={
+  10:'#DC2626',20:'#EF4444',30:'#F97316',40:'#FB923C',
+  50:'#EAB308',60:'#84CC16',70:'#22C55E',80:'#16A34A',90:'#15803D',100:'#166534'
+};
+function progColor(p){
+  const keys=Object.keys(PROG_COLORS).map(Number).sort((a,b)=>a-b);
+  const k=keys.find(k=>k>=p)||keys[keys.length-1];
+  return PROG_COLORS[k]||'#94A3B8';
+}
+
+// PROGRESS HISTOGRAM: bar chart grouped by progress %
+function ProgressHistogram({data}){
+  if(!data.length)return<p className="text-gray-400 text-sm py-8 text-center">ไม่มีข้อมูลความก้าวหน้า</p>;
+  const max=Math.max(...data.map(d=>d.count),1);
+  const H=160,BW=40,GAP=14,PL=40;
+  const totalW=PL+data.length*(BW+GAP)+GAP;
+  const yTicks=[0,10,20,30].filter(v=>v<=Math.ceil(max/10)*10);
+  return(
+    <div className="overflow-x-auto">
+      <svg viewBox={`0 0 ${totalW} ${H+55}`} style={{maxWidth:'100%',display:'block',minWidth:260}}>
+        {/* Y gridlines + labels */}
+        {yTicks.map(v=>{
+          const y=H-(v/Math.ceil(max/10)*10)*H;
+          return(<g key={v}>
+            <line x1={PL-4} y1={y} x2={totalW} y2={y} stroke="#e5e7eb" strokeWidth="1"/>
+            <text x={PL-7} y={y+4} textAnchor="end" fontSize="10" fill="#9ca3af">{v}</text>
+          </g>);
+        })}
+        {/* Y-axis label */}
+        <text transform="rotate(-90)" x={-(H/2)} y={11} textAnchor="middle" fontSize="9" fill="#6b7280">จำนวนโครงการ</text>
+        {/* Bars */}
+        {data.map((d,i)=>{
+          const x=PL+i*(BW+GAP)+GAP;
+          const h=Math.max((d.count/max)*H,2);
+          const col=progColor(d.value);
+          return(<g key={i}>
+            <rect x={x} y={H-h} width={BW} height={h} fill={col} rx="3"/>
+            <text x={x+BW/2} y={H-h-5} textAnchor="middle" fontSize="11" fill="#374151" fontWeight="700">{d.count}</text>
+            <text x={x+BW/2} y={H+14} textAnchor="middle" fontSize="10" fill="#6b7280">{d.value}</text>
+          </g>);
+        })}
+        {/* X-axis label */}
+        <text x={PL+data.length*(BW+GAP)/2} y={H+30} textAnchor="middle" fontSize="10" fill="#6b7280">ความก้าวหน้า (%)</text>
+        {/* Baseline */}
+        <line x1={PL-4} y1={H} x2={totalW} y2={H} stroke="#9ca3af" strokeWidth="1.5"/>
+      </svg>
+    </div>
+  );
+}
+
 // KPI CARD: label above + big number in colored box
 function KPICard({label,value,bg,large=true}){
   return(
@@ -215,9 +266,8 @@ function Badge({text,color}){
 
 const PAGES=[
   {id:'overview',label:'ภาพรวม',icon:'📊'},
-  {id:'projects',label:'รายชื่อโครงการ',icon:'📁'},
-  {id:'mentors', label:'พี่เลี้ยง',icon:'👤'},
-  {id:'mapping', label:'Mapping',icon:'🗺️'},
+  {id:'assess',  label:'ประเมินโครงการ',icon:'📈'},
+  {id:'mapping', label:'mapping โครงการ',icon:'🗺️'},
 ];
 const MENTOR_PER_PAGE=10;
 
@@ -573,73 +623,121 @@ export default function Dashboard(){
               </div>
             )}
 
-            {/* ═══ PROJECTS ═══ */}
-            {page==='projects'&&(
-              <div className="bg-white rounded-2xl shadow p-4">
-                <h3 className="font-bold text-gray-800 mb-4">📁 รายชื่อโครงการ ({projectRows.length} โครงการ)</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-[#C8102E] text-white">
-                        {['ที่','ชื่อโครงการ','ภาค','จังหวัด','ประเด็น','สถานะ','แกนนำ','เป้าหมาย','ความคืบหน้า','พี่เลี้ยง','งบประมาณ'].map(h=>(
-                          <th key={h} className="px-2 py-2 text-left whitespace-nowrap">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {projectRows.map((p,i)=>(
-                        <tr key={i} className={`${i%2===0?'bg-gray-50':'bg-white'} hover:bg-blue-50 transition-colors`}>
-                          <td className="px-2 py-2 text-gray-400 text-center">{p.no}</td>
-                          <td className="px-2 py-2 font-medium max-w-xs"><div className="truncate" title={p.name}>{p.name}</div>{p.subReg&&<div className="text-xs text-gray-400">{p.subReg}</div>}</td>
-                          <td className="px-2 py-2"><Badge text={p.region} color={REGION_COLORS[p.region]??'#94A3B8'}/></td>
-                          <td className="px-2 py-2 text-gray-600 whitespace-nowrap">{p.province}</td>
-                          <td className="px-2 py-2 max-w-[120px]"><div className="truncate text-xs" title={p.issue}>{p.issue}</div></td>
-                          <td className="px-2 py-2"><Badge text={p.status} color={statusColor(p.status)}/></td>
-                          <td className="px-2 py-2 text-center font-bold text-[#F97316]">{p.leaders||'-'}</td>
-                          <td className="px-2 py-2 text-center font-bold text-[#1D4ED8]">{p.targetP||'-'}</td>
-                          <td className="px-2 py-2">{p.progress>0&&(<div className="flex items-center gap-1"><div className="flex-1 bg-gray-200 rounded h-2"><div className="h-2 rounded" style={{width:`${Math.min(p.progress,100)}%`,background:'#1B3A8C'}}/></div><span className="text-xs font-bold text-gray-600">{p.progress}%</span></div>)}</td>
-                          <td className="px-2 py-2 text-gray-600 text-xs whitespace-nowrap" title={p.mentor}>{p.mentorNick}</td>
-                          <td className="px-2 py-2 text-right text-xs text-gray-500 whitespace-nowrap">{p.budget?`฿${(p.budget/1000).toLocaleString()}K`:'-'}</td>
-                        </tr>
-                      ))}
-                      {projectRows.length===0&&<tr><td colSpan="11" className="text-center py-10 text-gray-400">ไม่พบโครงการ</td></tr>}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            {/* ═══ ประเมินโครงการ ═══ */}
+            {page==='assess'&&(()=>{
+              const progRows=filtered.filter(r=>getProgress(r)>0);
+              // Histogram: group by progress value
+              const grp={};
+              progRows.forEach(r=>{const p=getProgress(r);grp[p]=(grp[p]||0)+1;});
+              const histData=Object.entries(grp).map(([v,c])=>({value:parseInt(v),count:c})).sort((a,b)=>a.value-b.value);
+              // classify: <=40 = พัฒนาอีกนิด, >40 = น่าสนใจ/ทำสื่อ
+              const isDev=r=>getProgress(r)>0&&getProgress(r)<=40;
+              const isInt=r=>getProgress(r)>40;
+              const maxBar=Math.max(...REGIONS.map(reg=>{
+                const rs=filteredBase.filter(r=>getRegion(r)===reg);
+                return Math.max(rs.filter(isDev).length,rs.filter(isInt).length);
+              }),1);
+              const totalDev=filteredBase.filter(isDev).length;
+              const totalInt=filteredBase.filter(isInt).length;
+              return(
+                <div className="space-y-4">
+                  {/* TOP ROW */}
+                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 items-start">
+                    {/* Left: histogram */}
+                    <div className="bg-white rounded-xl shadow p-5">
+                      <h3 className="font-bold text-gray-800 mb-4">ประเมินความก้าวหน้าโครงการ</h3>
+                      <ProgressHistogram data={histData}/>
+                    </div>
+                    {/* Right: region breakdown table */}
+                    <div className="bg-white rounded-xl shadow p-5">
+                      <h3 className="font-bold text-gray-800 mb-1 text-sm leading-snug">โครงการที่น่าสนใจ/ทำสื่อ/ถอดบทเรียน</h3>
+                      <p className="text-xs text-gray-400 mb-3">จำแนกตามภาค</p>
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b-2 border-gray-200">
+                            <th className="text-left py-1.5 font-semibold text-gray-600 pr-3">ภาค</th>
+                            <th className="text-left py-1.5 font-semibold text-gray-600 px-2" colSpan="2">พัฒนาอีกนิด</th>
+                            <th className="text-left py-1.5 font-semibold text-gray-600 px-2 whitespace-nowrap" colSpan="2">น่าสนใจ ทำสื่อ</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {REGIONS.map(reg=>{
+                            const rs=filteredBase.filter(r=>getRegion(r)===reg);
+                            const dev=rs.filter(isDev).length;
+                            const intr=rs.filter(isInt).length;
+                            if(!dev&&!intr)return null;
+                            return(
+                              <tr key={reg} className="border-b border-gray-100">
+                                <td className="py-2 pr-3 font-medium text-gray-700 whitespace-nowrap" style={{color:REGION_COLORS[reg]}}>{reg}</td>
+                                <td className="py-2 pl-2 font-bold text-gray-700 w-8 text-right">{dev||''}</td>
+                                <td className="py-2 pr-3 w-24">
+                                  {dev>0&&<div className="h-3 rounded-sm" style={{width:`${Math.round((dev/maxBar)*88)}px`,background:'#22D3EE'}}/>}
+                                </td>
+                                <td className="py-2 pl-2 font-bold text-gray-700 w-8 text-right">{intr||''}</td>
+                                <td className="py-2 pr-2 w-24">
+                                  {intr>0&&<div className="h-3 rounded-sm" style={{width:`${Math.round((intr/maxBar)*88)}px`,background:'#22D3EE'}}/>}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t-2 border-gray-300">
+                            <td className="py-2 pr-3 font-bold text-gray-800">รวมทั้งหมด</td>
+                            <td className="py-2 pl-2 font-extrabold text-gray-900 text-sm" colSpan="2">{totalDev}</td>
+                            <td className="py-2 pl-2 font-extrabold text-gray-900 text-sm" colSpan="2">{totalInt}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
 
-            {/* ═══ MENTORS ═══ */}
-            {page==='mentors'&&(
-              <div className="bg-white rounded-2xl shadow p-4">
-                <h3 className="font-bold text-gray-800 mb-4">👤 รายชื่อพี่เลี้ยง ({mentorRows.length} คน)</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-[#0F766E] text-white">
-                        {['ที่','ชื่อเล่น','ชื่อ-สกุล','ภาค','จังหวัดที่รับผิดชอบ','โครงการ','แกนนำรวม'].map(h=>(
-                          <th key={h} className="px-3 py-2 text-left">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mentorRows.map((m,i)=>(
-                        <tr key={i} className={i%2===0?'bg-gray-50':'bg-white'}>
-                          <td className="px-3 py-2 text-gray-400 text-center">{m.no}</td>
-                          <td className="px-3 py-2 font-extrabold text-[#1B3A8C]">{m.nick}</td>
-                          <td className="px-3 py-2 font-medium text-gray-800">{m.name}</td>
-                          <td className="px-3 py-2"><Badge text={m.region} color={REGION_COLORS[m.region]??'#94A3B8'}/></td>
-                          <td className="px-3 py-2 text-gray-600 text-xs">{m.provinces}</td>
-                          <td className="px-3 py-2 text-center font-bold text-[#1B3A8C]">{m.count}</td>
-                          <td className="px-3 py-2 text-center font-bold text-[#F97316]">{m.leaders||'-'}</td>
-                        </tr>
-                      ))}
-                      {mentorRows.length===0&&<tr><td colSpan="7" className="text-center py-10 text-gray-400">ไม่พบข้อมูลพี่เลี้ยง</td></tr>}
-                    </tbody>
-                  </table>
+                  {/* BOTTOM: project list */}
+                  <div className="bg-white rounded-xl shadow overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                      <h3 className="font-bold text-gray-800 text-sm">รายชื่อโครงการ ({progRows.length} โครงการ)</h3>
+                      <span className="text-xs text-gray-400">เรียงตามภาค</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200 text-xs">
+                            <th className="px-3 py-2 text-left text-gray-500 font-semibold w-12">ที่</th>
+                            <th className="px-3 py-2 text-left text-gray-700 font-bold">โครงการ</th>
+                            <th className="px-3 py-2 text-left text-gray-700 font-bold">ภาค</th>
+                            <th className="px-3 py-2 text-left text-gray-700 font-bold w-44">ความก้าวหน้า</th>
+                            <th className="px-3 py-2 text-left text-gray-700 font-bold">พี่เลี้ยง</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {progRows.map((r,i)=>{
+                            const prog=getProgress(r);
+                            const col=progColor(prog);
+                            return(
+                              <tr key={i} className={`border-b border-gray-100 ${i%2===0?'bg-white':'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
+                                <td className="px-3 py-2 text-gray-400">{getRowNo(r)||i+1}</td>
+                                <td className="px-3 py-2 text-gray-800 text-sm">{getProject(r)}</td>
+                                <td className="px-3 py-2"><Badge text={getRegion(r)} color={REGION_COLORS[getRegion(r)]??'#94A3B8'}/></td>
+                                <td className="px-3 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-28 bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                                      <div className="h-2.5 rounded-full transition-all" style={{width:`${Math.min(prog,100)}%`,background:col}}/>
+                                    </div>
+                                    <span className="text-xs font-bold w-9 text-right" style={{color:col}}>{prog}%</span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2 text-gray-600 text-xs font-semibold">{getMentorNick(r)}</td>
+                              </tr>
+                            );
+                          })}
+                          {progRows.length===0&&<tr><td colSpan="5" className="text-center py-10 text-gray-400">ไม่มีข้อมูลความก้าวหน้า</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* ═══ MAPPING ═══ */}
             {page==='mapping'&&(
