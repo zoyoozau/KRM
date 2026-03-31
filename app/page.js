@@ -70,24 +70,10 @@ const getRegion   = r => g(r, 'ภาค');
 const getSubReg   = r => g(r, 'กลุ่มจังหวัด');
 const getProvince = r => g(r, 'จังหวัด');
 const getDistrict = r => g(r, 'อำเภอ');
-const getMentor   = r => g(r, 'รายชื่อพี่เลี้ยง');
-
-// ─── EXTRACT NICKNAME (ชื่อเล่น) จากชื่อเต็ม ────────────────────────────────
-// รูปแบบที่รองรับ:
-//   1. "นายสมชาย ดีมาก (ต้น)"   → "ต้น"      (ข้อความในวงเล็บ)
-//   2. "นางสาวสมหญิง ใจดี"       → "สมหญิง"   (ตัดคำนำหน้า เอาชื่อแรก)
-//   3. ชื่อสั้น ≤ 6 ตัวอักษร    → แสดงเต็ม
-const THAI_TITLE_RE = /^(นาย|นาง(?:สาว)?|ดร\.|ดร|อ\.|ผศ\.|รศ\.|ศ\.|นพ\.|ทพ\.|พ\.ต\.|พ\.อ\.|ร\.ต\.|ร\.อ\.|ส\.ต\.|พ\.ท\.|ส\.อ\.|จ\.อ\.|พ\.ต\.ต\.|ร\.ต\.ต\.|พล\.ต\.|พล\.อ\.)\s*/g;
-function extractNickname(fullName) {
-  if (!fullName) return '';
-  // Pattern 1: ข้อความในวงเล็บ → ชื่อเล่น
-  const parenMatch = fullName.match(/[(（]([^)）]+)[)）]/);
-  if (parenMatch) return parenMatch[1].trim();
-  // Pattern 2: ตัดคำนำหน้าแล้วเอาชื่อแรก
-  const stripped = fullName.replace(THAI_TITLE_RE, '').trim();
-  const firstWord = stripped.split(/\s+/)[0] || stripped;
-  return firstWord;
-}
+const getMentor    = r => g(r, 'รายชื่อพี่เลี้ยง');
+// BO = "ชื่อเล่น" คอลัมน์แยกใน Google Sheets
+// ถ้า BO ว่าง ให้ fallback แสดงชื่อเต็มแทน
+const getMentorNick = r => g(r, 'ชื่อเล่น') || getMentor(r);
 
 const getStatus   = r => g(r, 'สถานะ');
 const getIssue    = r => g(r, 'ประเด็น');
@@ -284,13 +270,15 @@ export default function Dashboard() {
     no:i+1, rowNo:getRowNo(r), name:getProject(r), region:getRegion(r), subReg:getSubReg(r),
     province:getProvince(r), issue:getIssue(r), status:getStatus(r),
     budget:getBudget(r), leaders:getLeaders(r), targetP:getTargetP(r), targetG:getTargetG(r),
-    progress:getProgress(r), mentor:getMentor(r), mentorNick:extractNickname(getMentor(r)), lat:getLat(r), lon:getLon(r),
+    progress:getProgress(r), mentor:getMentor(r), mentorNick:getMentorNick(r), lat:getLat(r), lon:getLon(r),
     type: getProjectType(getBudget(r)),
   }));
 
   const mentorRows = mentorSet.map((m,i)=>{
     const ps = filtered.filter(r=>getMentor(r)===m);
-    return { no:i+1, name:m, nick:extractNickname(m), region:getRegion(ps[0]||{}), count:ps.length,
+    // ดึงชื่อเล่นจากแถวแรกที่ตรงกับพี่เลี้ยงนี้
+    const nick = ps.length > 0 ? getMentorNick(ps[0]) : m;
+    return { no:i+1, name:m, nick, region:getRegion(ps[0]||{}), count:ps.length,
       provinces:[...new Set(ps.map(getProvince))].join(', '),
       leaders:ps.reduce((s,r)=>s+getLeaders(r),0) };
   });
