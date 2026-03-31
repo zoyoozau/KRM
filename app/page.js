@@ -214,12 +214,13 @@ function progColor(p){
 function ProgressHistogram({data}){
   if(!data.length)return<p className="text-gray-400 text-sm py-8 text-center">ไม่มีข้อมูลความก้าวหน้า</p>;
   const max=Math.max(...data.map(d=>d.count),1);
-  const H=160,BW=40,GAP=14,PL=40;
+  const H=160,BW=44,GAP=16,PL=42;
   const totalW=PL+data.length*(BW+GAP)+GAP;
   const yTicks=[0,10,20,30].filter(v=>v<=Math.ceil(max/10)*10);
   return(
-    <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${totalW} ${H+55}`} style={{maxWidth:'100%',display:'block',minWidth:260}}>
+    // max-w จำกัดไม่ให้กว้างเกิน 560px บนจอใหญ่
+    <div className="max-w-[560px]">
+      <svg viewBox={`0 0 ${totalW} ${H+55}`} width={totalW} style={{maxWidth:'100%',display:'block'}}>
         {/* Y gridlines + labels */}
         {yTicks.map(v=>{
           const y=H-(v/Math.ceil(max/10)*10)*H;
@@ -246,7 +247,7 @@ function ProgressHistogram({data}){
         {/* Baseline */}
         <line x1={PL-4} y1={H} x2={totalW} y2={H} stroke="#9ca3af" strokeWidth="1.5"/>
       </svg>
-    </div>
+    </div>  {/* /max-w-[560px] */}
   );
 }
 
@@ -643,23 +644,25 @@ export default function Dashboard(){
               const totalInt=filteredBase.filter(isInt).length;
               return(
                 <div className="space-y-4">
-                  {/* TOP ROW */}
-                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 items-start">
-                    {/* Left: histogram */}
-                    <div className="bg-white rounded-xl shadow p-5">
-                      <h3 className="font-bold text-gray-800 mb-4">ประเมินความก้าวหน้าโครงการ</h3>
-                      <ProgressHistogram data={histData}/>
+                  {/* TOP ROW — histogram left, breakdown table right */}
+                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(320px,1.4fr)] xl:grid-cols-[minmax(0,3fr)_minmax(360px,1.4fr)] gap-4 items-start">
+                    {/* Left: histogram — constrained + centered */}
+                    <div className="bg-white rounded-xl shadow p-6">
+                      <h3 className="font-bold text-gray-800 mb-4 text-base">ประเมินความก้าวหน้าโครงการ</h3>
+                      <div className="flex justify-center">
+                        <ProgressHistogram data={histData}/>
+                      </div>
                     </div>
                     {/* Right: region breakdown table */}
-                    <div className="bg-white rounded-xl shadow p-5">
-                      <h3 className="font-bold text-gray-800 mb-1 text-sm leading-snug">โครงการที่น่าสนใจ/ทำสื่อ/ถอดบทเรียน</h3>
-                      <p className="text-xs text-gray-400 mb-3">จำแนกตามภาค</p>
-                      <table className="w-full text-xs">
+                    <div className="bg-white rounded-xl shadow p-6">
+                      <h3 className="font-bold text-gray-800 mb-1 text-base leading-snug">โครงการที่น่าสนใจ/ทำสื่อ/ถอดบทเรียน</h3>
+                      <p className="text-xs text-gray-400 mb-4">จำแนกตามภาค</p>
+                      <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b-2 border-gray-200">
-                            <th className="text-left py-1.5 font-semibold text-gray-600 pr-3">ภาค</th>
-                            <th className="text-left py-1.5 font-semibold text-gray-600 px-2" colSpan="2">พัฒนาอีกนิด</th>
-                            <th className="text-left py-1.5 font-semibold text-gray-600 px-2 whitespace-nowrap" colSpan="2">น่าสนใจ ทำสื่อ</th>
+                            <th className="text-left py-2 font-semibold text-gray-600 pr-4">ภาค</th>
+                            <th className="text-left py-2 font-semibold text-gray-600 px-2" colSpan="2">พัฒนาอีกนิด</th>
+                            <th className="text-left py-2 font-semibold text-gray-600 px-2 whitespace-nowrap" colSpan="2">น่าสนใจ ทำสื่อ</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -670,24 +673,24 @@ export default function Dashboard(){
                             if(!dev&&!intr)return null;
                             return(
                               <tr key={reg} className="border-b border-gray-100">
-                                <td className="py-2 pr-3 font-medium text-gray-700 whitespace-nowrap" style={{color:REGION_COLORS[reg]}}>{reg}</td>
-                                <td className="py-2 pl-2 font-bold text-gray-700 w-8 text-right">{dev||''}</td>
-                                <td className="py-2 pr-3 w-24">
-                                  {dev>0&&<div className="h-3 rounded-sm" style={{width:`${Math.round((dev/maxBar)*88)}px`,background:'#22D3EE'}}/>}
+                                <td className="py-2.5 pr-4 font-semibold whitespace-nowrap" style={{color:REGION_COLORS[reg]}}>{reg}</td>
+                                <td className="py-2.5 pl-2 font-bold text-gray-800 w-10 text-right">{dev||''}</td>
+                                <td className="py-2.5 pr-3">
+                                  {dev>0&&<div className="h-3.5 rounded" style={{width:`${Math.round((dev/maxBar)*100)}px`,background:'#22D3EE',minWidth:4}}/>}
                                 </td>
-                                <td className="py-2 pl-2 font-bold text-gray-700 w-8 text-right">{intr||''}</td>
-                                <td className="py-2 pr-2 w-24">
-                                  {intr>0&&<div className="h-3 rounded-sm" style={{width:`${Math.round((intr/maxBar)*88)}px`,background:'#22D3EE'}}/>}
+                                <td className="py-2.5 pl-2 font-bold text-gray-800 w-10 text-right">{intr||''}</td>
+                                <td className="py-2.5 pr-2">
+                                  {intr>0&&<div className="h-3.5 rounded" style={{width:`${Math.round((intr/maxBar)*100)}px`,background:'#22D3EE',minWidth:4}}/>}
                                 </td>
                               </tr>
                             );
                           })}
                         </tbody>
                         <tfoot>
-                          <tr className="border-t-2 border-gray-300">
-                            <td className="py-2 pr-3 font-bold text-gray-800">รวมทั้งหมด</td>
-                            <td className="py-2 pl-2 font-extrabold text-gray-900 text-sm" colSpan="2">{totalDev}</td>
-                            <td className="py-2 pl-2 font-extrabold text-gray-900 text-sm" colSpan="2">{totalInt}</td>
+                          <tr className="border-t-2 border-gray-200 bg-gray-50">
+                            <td className="py-3 pr-4 font-bold text-gray-800">รวมทั้งหมด</td>
+                            <td className="py-3 pl-2 font-extrabold text-gray-900 text-base" colSpan="2">{totalDev}</td>
+                            <td className="py-3 pl-2 font-extrabold text-gray-900 text-base" colSpan="2">{totalInt}</td>
                           </tr>
                         </tfoot>
                       </table>
