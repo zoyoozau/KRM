@@ -71,6 +71,24 @@ const getSubReg   = r => g(r, 'กลุ่มจังหวัด');
 const getProvince = r => g(r, 'จังหวัด');
 const getDistrict = r => g(r, 'อำเภอ');
 const getMentor   = r => g(r, 'รายชื่อพี่เลี้ยง');
+
+// ─── EXTRACT NICKNAME (ชื่อเล่น) จากชื่อเต็ม ────────────────────────────────
+// รูปแบบที่รองรับ:
+//   1. "นายสมชาย ดีมาก (ต้น)"   → "ต้น"      (ข้อความในวงเล็บ)
+//   2. "นางสาวสมหญิง ใจดี"       → "สมหญิง"   (ตัดคำนำหน้า เอาชื่อแรก)
+//   3. ชื่อสั้น ≤ 6 ตัวอักษร    → แสดงเต็ม
+const THAI_TITLE_RE = /^(นาย|นาง(?:สาว)?|ดร\.|ดร|อ\.|ผศ\.|รศ\.|ศ\.|นพ\.|ทพ\.|พ\.ต\.|พ\.อ\.|ร\.ต\.|ร\.อ\.|ส\.ต\.|พ\.ท\.|ส\.อ\.|จ\.อ\.|พ\.ต\.ต\.|ร\.ต\.ต\.|พล\.ต\.|พล\.อ\.)\s*/g;
+function extractNickname(fullName) {
+  if (!fullName) return '';
+  // Pattern 1: ข้อความในวงเล็บ → ชื่อเล่น
+  const parenMatch = fullName.match(/[(（]([^)）]+)[)）]/);
+  if (parenMatch) return parenMatch[1].trim();
+  // Pattern 2: ตัดคำนำหน้าแล้วเอาชื่อแรก
+  const stripped = fullName.replace(THAI_TITLE_RE, '').trim();
+  const firstWord = stripped.split(/\s+/)[0] || stripped;
+  return firstWord;
+}
+
 const getStatus   = r => g(r, 'สถานะ');
 const getIssue    = r => g(r, 'ประเด็น');
 const getLat      = r => parseFloat(g(r, 'latitude')) || null;
@@ -266,13 +284,13 @@ export default function Dashboard() {
     no:i+1, rowNo:getRowNo(r), name:getProject(r), region:getRegion(r), subReg:getSubReg(r),
     province:getProvince(r), issue:getIssue(r), status:getStatus(r),
     budget:getBudget(r), leaders:getLeaders(r), targetP:getTargetP(r), targetG:getTargetG(r),
-    progress:getProgress(r), mentor:getMentor(r), lat:getLat(r), lon:getLon(r),
+    progress:getProgress(r), mentor:getMentor(r), mentorNick:extractNickname(getMentor(r)), lat:getLat(r), lon:getLon(r),
     type: getProjectType(getBudget(r)),
   }));
 
   const mentorRows = mentorSet.map((m,i)=>{
     const ps = filtered.filter(r=>getMentor(r)===m);
-    return { no:i+1, name:m, region:getRegion(ps[0]||{}), count:ps.length,
+    return { no:i+1, name:m, nick:extractNickname(m), region:getRegion(ps[0]||{}), count:ps.length,
       provinces:[...new Set(ps.map(getProvince))].join(', '),
       leaders:ps.reduce((s,r)=>s+getLeaders(r),0) };
   });
@@ -474,7 +492,10 @@ export default function Dashboard() {
                         <tbody>
                           {mentorRows.map((m,i)=>(
                             <tr key={i} className={i%2===0?'bg-gray-50':'bg-white'}>
-                              <td className="px-2 py-1.5 font-medium text-gray-800 truncate max-w-[130px]" title={m.name}>{m.name}</td>
+                              {/* แสดงชื่อเล่น + hover แสดงชื่อเต็ม */}
+                              <td className="px-2 py-1.5 font-medium text-gray-800 truncate max-w-[130px]" title={m.name}>
+                                {m.nick}
+                              </td>
                               <td className="px-2 py-1.5 text-center">
                                 <span className="inline-block w-2.5 h-2.5 rounded-full"
                                   style={{background:REGION_COLORS[m.region]??'#94A3B8'}}/>
@@ -620,7 +641,7 @@ export default function Dashboard() {
                               </div>
                             )}
                           </td>
-                          <td className="px-2 py-2 text-gray-600 text-xs whitespace-nowrap">{p.mentor}</td>
+                          <td className="px-2 py-2 text-gray-600 text-xs whitespace-nowrap" title={p.mentor}>{p.mentorNick}</td>
                           <td className="px-2 py-2 text-right text-xs text-gray-500 whitespace-nowrap">
                             {p.budget?`฿${(p.budget/1000).toLocaleString()}K`:'-'}
                           </td>
@@ -645,7 +666,7 @@ export default function Dashboard() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-[#0F766E] text-white">
-                        {['ที่','รายชื่อพี่เลี้ยง','ภาค','จังหวัดที่รับผิดชอบ','โครงการ','แกนนำรวม'].map(h=>(
+                        {['ที่','ชื่อเล่น','ชื่อ-สกุล','ภาค','จังหวัดที่รับผิดชอบ','โครงการ','แกนนำรวม'].map(h=>(
                           <th key={h} className="px-3 py-2 text-left">{h}</th>
                         ))}
                       </tr>
@@ -654,7 +675,8 @@ export default function Dashboard() {
                       {mentorRows.map((m,i)=>(
                         <tr key={i} className={i%2===0?'bg-gray-50':'bg-white'}>
                           <td className="px-3 py-2 text-gray-400 text-center">{m.no}</td>
-                          <td className="px-3 py-2 font-semibold text-gray-800">{m.name}</td>
+                          <td className="px-3 py-2 font-extrabold text-[#1B3A8C]">{m.nick}</td>
+                          <td className="px-3 py-2 text-gray-600 text-xs">{m.name}</td>
                           <td className="px-3 py-2"><Badge text={m.region} color={REGION_COLORS[m.region]??'#94A3B8'}/></td>
                           <td className="px-3 py-2 text-gray-600 text-xs">{m.provinces}</td>
                           <td className="px-3 py-2 text-center font-bold text-[#1B3A8C]">{m.count}</td>
@@ -662,7 +684,7 @@ export default function Dashboard() {
                         </tr>
                       ))}
                       {mentorRows.length===0&&(
-                        <tr><td colSpan="6" className="text-center py-10 text-gray-400">ไม่พบข้อมูลพี่เลี้ยง</td></tr>
+                        <tr><td colSpan="7" className="text-center py-10 text-gray-400">ไม่พบข้อมูลพี่เลี้ยง</td></tr>
                       )}
                     </tbody>
                   </table>
