@@ -143,27 +143,30 @@ function PieChart({data,size=200,onSliceClick,activeRegion}){
   );
 }
 
-// BAR CHART: ทดลอง vs รูปธรรม
-function TypeBarChart({data}){
-  if(!data.length)return null;
-  const max=Math.max(...data.flatMap(d=>[d.ทดลอง??0,d.รูปธรรม??0]),1);
+// BAR CHART: ทดลอง vs รูปธรรม — fixed 5-region layout (ขนาดคงที่เสมอ)
+const BAR_LABELS={'ภาคเหนือ':'เหนือ','ใต้':'ใต้','ภาคอีสาน':'อีสาน','กทม.ตะวันออก':'กทม.','กลางตะวันตก':'กลาง'};
+function TypeBarChart({data,globalMax=1}){
   const H=130,BW=22,GAP=4,GG=18;
-  const svgW=data.length*(BW*2+GAP+GG)+GG*2;
-  // กำหนดความกว้างตามจำนวน group (ไม่ให้ยืดเต็มจอเมื่อ group น้อย)
-  const displayW=Math.max(svgW, 180);
+  // ล็อคขนาด SVG ให้เท่ากับ 5 regions เสมอ
+  const totalW=REGIONS.length*(BW*2+GAP+GG)+GG*2;
+  const max=Math.max(globalMax,1);
   return(
     <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${svgW} ${H+50}`} width={displayW} style={{maxWidth:'100%',display:'block'}}>
-        {data.map((d,gi)=>{
+      <svg viewBox={`0 0 ${totalW} ${H+50}`} width={totalW} style={{maxWidth:'100%',display:'block'}}>
+        {REGIONS.map((reg,gi)=>{
+          const lbl=BAR_LABELS[reg]||reg;
+          const d=data.find(d=>d.label===lbl)||{label:lbl,ทดลอง:0,รูปธรรม:0};
+          const active=data.some(d=>d.label===lbl&&(d.ทดลอง>0||d.รูปธรรม>0));
           const x=gi*(BW*2+GAP+GG)+GG;
-          const hT=(d.ทดลอง??0)/max*H,hR=(d.รูปธรรม??0)/max*H;
+          const hT=(d.ทดลอง??0)/max*H;
+          const hR=(d.รูปธรรม??0)/max*H;
           return(
-            <g key={gi}>
-              <rect x={x} y={H-hT} width={BW} height={hT} fill="#555555" rx="2"/>
-              <rect x={x+BW+GAP} y={H-hR} width={BW} height={hR} fill="#B91C1C" rx="2"/>
-              {d.ทดลอง>0&&<text x={x+BW/2} y={H-hT-4} textAnchor="middle" fontSize="10" fill="#333" fontWeight="700">{d.ทดลอง}</text>}
-              {d.รูปธรรม>0&&<text x={x+BW+GAP+BW/2} y={H-hR-4} textAnchor="middle" fontSize="10" fill="#333" fontWeight="700">{d.รูปธรรม}</text>}
-              <text x={x+BW+GAP/2} y={H+14} textAnchor="middle" fontSize="9" fill="#666">{d.label}</text>
+            <g key={gi} style={{opacity:active?1:0.18,transition:'opacity 0.5s ease'}}>
+              <rect x={x} y={H-hT} width={BW} height={Math.max(hT,0)} fill="#555555" rx="2"/>
+              <rect x={x+BW+GAP} y={H-hR} width={BW} height={Math.max(hR,0)} fill="#B91C1C" rx="2"/>
+              {d.ทดลอง>0&&<text x={x+BW/2} y={H-hT-4} textAnchor="middle" fontSize="10" fill={active?'#333':'#bbb'} fontWeight="700">{d.ทดลอง}</text>}
+              {d.รูปธรรม>0&&<text x={x+BW+GAP+BW/2} y={H-hR-4} textAnchor="middle" fontSize="10" fill={active?'#333':'#bbb'} fontWeight="700">{d.รูปธรรม}</text>}
+              <text x={x+BW+GAP/2} y={H+14} textAnchor="middle" fontSize="9" fill={active?'#555':'#bbb'}>{lbl}</text>
             </g>
           );
         })}
@@ -207,6 +210,7 @@ export default function Dashboard(){
   const[region,setRegion]=useState('ทั้งหมด');
   const[province,setProvince]=useState('ทั้งหมด');
   const[issue,setIssue]=useState('ทั้งหมด');
+  const[fadeKey,setFadeKey]=useState(0);
   const[page,setPage]=useState('overview');
   const[menuOpen,setMenuOpen]=useState(false);
   const[search,setSearch]=useState('');
@@ -239,14 +243,21 @@ export default function Dashboard(){
   // การ filter ทำหน้าที่ highlight ชิ้นที่ active เท่านั้น
   const pieRegion=REGIONS.map(reg=>({label:reg,value:rows.filter(r=>getRegion(r)===reg).length})).filter(d=>d.value>0);
 
+  // barData: ส่งทุก region ให้ TypeBarChart ตัดสินใจ dim เอง
+  const _BL={'ภาคเหนือ':'เหนือ','ใต้':'ใต้','ภาคอีสาน':'อีสาน','กทม.ตะวันออก':'กทม.','กลางตะวันตก':'กลาง'};
   const barData=REGIONS.map(reg=>{
     const rs=filtered.filter(r=>getRegion(r)===reg);
     return{
-      label:reg.replace('ภาคเหนือ','เหนือ').replace('ภาคอีสาน','อีสาน').replace('กทม.ตะวันออก','กทม.').replace('กลางตะวันตก','กลาง'),
+      label:_BL[reg]||reg,
       ทดลอง:rs.filter(r=>getBudget(r)>0&&getBudget(r)<=70000).length,
       รูปธรรม:rs.filter(r=>getBudget(r)>70000).length,
     };
-  }).filter(d=>d.ทดลอง>0||d.รูปธรรม>0);
+  });
+  // globalBarMax: ใช้ ALL rows เพื่อให้สเกลแท่งสม่ำเสมอเสมอ
+  const globalBarMax=useMemo(()=>Math.max(...REGIONS.map(reg=>{
+    const rs=rows.filter(r=>getRegion(r)===reg);
+    return Math.max(rs.filter(r=>getBudget(r)>0&&getBudget(r)<=70000).length,rs.filter(r=>getBudget(r)>70000).length);
+  }),1),[rows]);
 
   const projectRows=filtered.map((r,i)=>({
     no:i+1,rowNo:getRowNo(r),name:getProject(r),region:getRegion(r),
@@ -273,10 +284,11 @@ export default function Dashboard(){
   const mentorFrom=mentorRows.length>0?safeMP*MENTOR_PER_PAGE+1:0;
   const mentorTo=Math.min((safeMP+1)*MENTOR_PER_PAGE,mentorRows.length);
 
-  const changeRegion=val=>{setRegion(val);setProvince('ทั้งหมด');setMentorPage(0);};
+  const changeRegion=val=>{setFadeKey(k=>k+1);setRegion(val);setProvince('ทั้งหมด');setMentorPage(0);};
 
   return(
     <div className="min-h-screen flex flex-col bg-white">
+      <style>{`@keyframes krmFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.krm-fade{animation:krmFadeIn 0.45s cubic-bezier(.22,.68,0,1.2) both}`}</style>
 
       {/* HEADER */}
       <header style={{background:'linear-gradient(90deg,#BF8B00 0%,#FFD700 30%,#FFE44D 50%,#FFD700 70%,#BF8B00 100%)'}}>
@@ -357,7 +369,8 @@ export default function Dashboard(){
             {page==='overview'&&(
               <div className="space-y-4">
 
-                {/* 3-COLUMN */}
+                {/* 3-COLUMN — fade เมื่อ filter เปลี่ยน */}
+                <div key={fadeKey} className="krm-fade space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,2.6fr)_minmax(0,3.4fr)] gap-4 items-start">
 
                   {/* LEFT: โครงการ + pie */}
@@ -394,7 +407,7 @@ export default function Dashboard(){
                     <KPICard label="กลุ่มเป้าหมาย (คน)" value={totalTargetP} bg="#15803D"/>
                     <KPICard label="กลุ่มเป้าหมาย (กลุ่มองค์กร...)" value={totalTargetG} bg="#16A34A" large={false}/>
                     <div className="pt-1">
-                      <TypeBarChart data={barData}/>
+                      <TypeBarChart data={barData} globalMax={globalBarMax}/>
                     </div>
                   </div>
 
@@ -470,6 +483,7 @@ export default function Dashboard(){
                     </table>
                   </div>
                 </div>
+                </div>{/* /krm-fade */}
               </div>
             )}
 
