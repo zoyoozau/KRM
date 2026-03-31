@@ -143,11 +143,11 @@ function PieChart({data,size=200,onSliceClick,activeRegion}){
   );
 }
 
-// BAR CHART: ทดลอง vs รูปธรรม — fixed 5-region layout (ขนาดคงที่เสมอ)
+// BAR CHART: ทดลอง vs รูปธรรม — fixed 5-region layout + clickable
 const BAR_LABELS={'ภาคเหนือ':'เหนือ','ใต้':'ใต้','ภาคอีสาน':'อีสาน','กทม.ตะวันออก':'กทม.','กลางตะวันตก':'กลาง'};
-function TypeBarChart({data,globalMax=1}){
+function TypeBarChart({data,globalMax=1,onBarClick,activeRegion}){
+  const[hovReg,setHovReg]=useState(null);
   const H=130,BW=22,GAP=4,GG=18;
-  // ล็อคขนาด SVG ให้เท่ากับ 5 regions เสมอ
   const totalW=REGIONS.length*(BW*2+GAP+GG)+GG*2;
   const max=Math.max(globalMax,1);
   return(
@@ -156,24 +156,42 @@ function TypeBarChart({data,globalMax=1}){
         {REGIONS.map((reg,gi)=>{
           const lbl=BAR_LABELS[reg]||reg;
           const d=data.find(d=>d.label===lbl)||{label:lbl,ทดลอง:0,รูปธรรม:0};
-          const active=data.some(d=>d.label===lbl&&(d.ทดลอง>0||d.รูปธรรม>0));
+          const hasData=data.some(d=>d.label===lbl&&(d.ทดลอง>0||d.รูปธรรม>0));
+          const isActive=activeRegion===reg;
+          const isHov=hovReg===reg&&hasData;
           const x=gi*(BW*2+GAP+GG)+GG;
           const hT=(d.ทดลอง??0)/max*H;
           const hR=(d.รูปธรรม??0)/max*H;
           return(
-            <g key={gi} style={{opacity:active?1:0.18,transition:'opacity 0.5s ease'}}>
-              <rect x={x} y={H-hT} width={BW} height={Math.max(hT,0)} fill="#555555" rx="2"/>
-              <rect x={x+BW+GAP} y={H-hR} width={BW} height={Math.max(hR,0)} fill="#B91C1C" rx="2"/>
-              {d.ทดลอง>0&&<text x={x+BW/2} y={H-hT-4} textAnchor="middle" fontSize="10" fill={active?'#333':'#bbb'} fontWeight="700">{d.ทดลอง}</text>}
-              {d.รูปธรรม>0&&<text x={x+BW+GAP+BW/2} y={H-hR-4} textAnchor="middle" fontSize="10" fill={active?'#333':'#bbb'} fontWeight="700">{d.รูปธรรม}</text>}
-              <text x={x+BW+GAP/2} y={H+14} textAnchor="middle" fontSize="9" fill={active?'#555':'#bbb'}>{lbl}</text>
+            <g key={gi}
+              style={{opacity:hasData?1:0.18,transition:'opacity 0.5s ease',cursor:hasData?'pointer':'default'}}
+              onMouseEnter={()=>hasData&&setHovReg(reg)}
+              onMouseLeave={()=>setHovReg(null)}
+              onClick={()=>hasData&&onBarClick&&onBarClick(reg)}>
+              {/* hit-area transparent */}
+              <rect x={x-3} y={0} width={BW*2+GAP+6} height={H+16} fill="transparent"/>
+              {/* hover/active bg highlight */}
+              {(isActive||isHov)&&hasData&&(
+                <rect x={x-3} y={2} width={BW*2+GAP+6} height={H-2} fill={isActive?'#1B3A8C':'#DBEAFE'} rx="4" opacity={isActive?0.12:0.6}/>
+              )}
+              <rect x={x} y={H-hT} width={BW} height={Math.max(hT,0)} fill={isHov?'#333':'#555555'} rx="2"/>
+              <rect x={x+BW+GAP} y={H-hR} width={BW} height={Math.max(hR,0)} fill={isHov?'#991111':'#B91C1C'} rx="2"/>
+              {d.ทดลอง>0&&<text x={x+BW/2} y={H-hT-4} textAnchor="middle" fontSize="10" fill={hasData?'#333':'#bbb'} fontWeight="700">{d.ทดลอง}</text>}
+              {d.รูปธรรม>0&&<text x={x+BW+GAP+BW/2} y={H-hR-4} textAnchor="middle" fontSize="10" fill={hasData?'#333':'#bbb'} fontWeight="700">{d.รูปธรรม}</text>}
+              <text x={x+BW+GAP/2} y={H+13} textAnchor="middle"
+                fontSize={isActive?10:9} fontWeight={isActive?'800':'normal'}
+                fill={isActive?'#1B3A8C':hasData?'#555':'#bbb'}>{lbl}</text>
+              {/* active underline */}
+              {isActive&&<rect x={x-1} y={H+17} width={BW*2+GAP+2} height={2} fill="#1B3A8C" rx="1"/>}
             </g>
           );
         })}
-        <rect x={GG} y={H+24} width={12} height={12} fill="#555555" rx="1"/>
-        <text x={GG+15} y={H+34} fontSize="10" fill="#444">ทดลอง</text>
-        <rect x={GG+62} y={H+24} width={12} height={12} fill="#B91C1C" rx="1"/>
-        <text x={GG+77} y={H+34} fontSize="10" fill="#444">รูปธรรม</text>
+        <rect x={GG} y={H+26} width={12} height={12} fill="#555555" rx="1"/>
+        <text x={GG+15} y={H+36} fontSize="10" fill="#444">ทดลอง</text>
+        <rect x={GG+62} y={H+26} width={12} height={12} fill="#B91C1C" rx="1"/>
+        <text x={GG+77} y={H+36} fontSize="10" fill="#444">รูปธรรม</text>
+        {/* hint */}
+        <text x={totalW/2} y={H+46} textAnchor="middle" fontSize="8" fill="#aaa">คลิกเพื่อกรองภาค</text>
       </svg>
     </div>
   );
@@ -216,6 +234,7 @@ export default function Dashboard(){
   const[search,setSearch]=useState('');
   const[mentorPage,setMentorPage]=useState(0);
   const[mentorFilter,setMentorFilter]=useState('');
+  const[expandedIdx,setExpandedIdx]=useState(null);
 
   useEffect(()=>{
     fetch(CSV_URL)
@@ -290,8 +309,8 @@ export default function Dashboard(){
   const mentorFrom=mentorRows.length>0?safeMP*MENTOR_PER_PAGE+1:0;
   const mentorTo=Math.min((safeMP+1)*MENTOR_PER_PAGE,mentorRows.length);
 
-  const changeRegion=val=>{setFadeKey(k=>k+1);setRegion(val);setProvince('ทั้งหมด');setMentorFilter('');setMentorPage(0);};
-  const changeMentor=name=>{setFadeKey(k=>k+1);setMentorFilter(prev=>prev===name?'':name);setMentorPage(0);};
+  const changeRegion=val=>{setFadeKey(k=>k+1);setRegion(val);setProvince('ทั้งหมด');setMentorFilter('');setMentorPage(0);setExpandedIdx(null);};
+  const changeMentor=name=>{setFadeKey(k=>k+1);setMentorFilter(prev=>prev===name?'':name);setMentorPage(0);setExpandedIdx(null);};
 
   return(
     <div className="min-h-screen flex flex-col bg-white">
@@ -414,7 +433,12 @@ export default function Dashboard(){
                     <KPICard label="กลุ่มเป้าหมาย (คน)" value={totalTargetP} bg="#15803D"/>
                     <KPICard label="กลุ่มเป้าหมาย (กลุ่มองค์กร...)" value={totalTargetG} bg="#16A34A" large={false}/>
                     <div className="pt-1">
-                      <TypeBarChart data={barData} globalMax={globalBarMax}/>
+                      <TypeBarChart
+                        data={barData}
+                        globalMax={globalBarMax}
+                        activeRegion={region!=='ทั้งหมด'?region:null}
+                        onBarClick={reg=>changeRegion(region===reg?'ทั้งหมด':reg)}
+                      />
                     </div>
                   </div>
 
@@ -496,13 +520,50 @@ export default function Dashboard(){
                         </tr>
                       </thead>
                       <tbody>
-                        {projectRows.map((p,i)=>(
-                          <tr key={i} className={`border-b border-gray-100 last:border-0 ${i%2===0?'bg-white':'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
-                            <td className="px-3 py-2 text-gray-500">{p.rowNo||p.no}</td>
-                            <td className="px-3 py-2 text-gray-800">{p.name}</td>
-                            <td className="px-3 py-2 font-semibold" style={{color:TYPE_COLOR[p.type]??'#94A3B8'}}>{p.type}</td>
-                          </tr>
-                        ))}
+                        {projectRows.flatMap((p,i)=>{
+                          const isExp=expandedIdx===i;
+                          return[
+                            <tr key={`r${i}`}
+                              onClick={()=>setExpandedIdx(isExp?null:i)}
+                              className={`border-b border-gray-100 cursor-pointer transition-colors
+                                ${isExp?'bg-blue-50 border-b-0':i%2===0?'bg-white':'bg-gray-50'} hover:bg-blue-50`}>
+                              <td className="px-3 py-2 text-gray-400 w-10">{p.rowNo||p.no}</td>
+                              <td className="px-3 py-2 text-gray-800">
+                                <div className="flex items-start gap-1.5">
+                                  <span className={`mt-0.5 text-xs shrink-0 transition-transform ${isExp?'rotate-90':''} text-gray-300`}>▶</span>
+                                  <span>{p.name}</span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-2 font-semibold whitespace-nowrap" style={{color:TYPE_COLOR[p.type]??'#94A3B8'}}>{p.type}</td>
+                            </tr>,
+                            isExp&&(
+                              <tr key={`e${i}`} className="bg-blue-50 border-b border-blue-100">
+                                <td className="px-3 py-2 text-gray-300 text-xs text-right align-top">└</td>
+                                <td colSpan="2" className="px-3 pb-3 pt-1">
+                                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-gray-700">
+                                    <div><span className="text-gray-400">📍 จังหวัด </span><span className="font-medium">{p.province||'-'}</span></div>
+                                    <div><span className="text-gray-400">🗺️ ภาค </span><span className="font-medium" style={{color:REGION_COLORS[p.region]??'#555'}}>{p.region||'-'}</span></div>
+                                    <div><span className="text-gray-400">👤 พี่เลี้ยง </span><span className="font-semibold text-[#1B3A8C]">{p.mentorNick||'-'}</span></div>
+                                    <div><span className="text-gray-400">💰 งบประมาณ </span><span className="font-medium">{p.budget?`฿${p.budget.toLocaleString()}`:'-'}</span></div>
+                                    {p.issue&&<div className="col-span-2"><span className="text-gray-400">🏷️ ประเด็น </span>{p.issue}</div>}
+                                    {p.status&&<div><span className="text-gray-400">📋 สถานะ </span>{p.status}</div>}
+                                    {p.leaders>0&&<div><span className="text-gray-400">👥 แกนนำ </span><span className="font-semibold text-[#F97316]">{p.leaders} คน</span></div>}
+                                    {p.targetP>0&&<div><span className="text-gray-400">🎯 กลุ่มเป้าหมาย </span><span className="font-semibold text-[#1D4ED8]">{p.targetP} คน</span></div>}
+                                    {p.progress>0&&(
+                                      <div className="col-span-2 flex items-center gap-2 mt-0.5">
+                                        <span className="text-gray-400">📊 ความคืบหน้า </span>
+                                        <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-[140px]">
+                                          <div className="h-2 rounded-full transition-all" style={{width:`${Math.min(p.progress,100)}%`,background:'#1B3A8C'}}/>
+                                        </div>
+                                        <span className="font-bold text-[#1B3A8C]">{p.progress}%</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          ].filter(Boolean);
+                        })}
                         {projectRows.length===0&&<tr><td colSpan="3" className="text-center py-10 text-gray-400">ไม่พบโครงการ</td></tr>}
                       </tbody>
                     </table>
