@@ -79,7 +79,12 @@ const getBudget   = r => { const v = g(r, 'งบประมาณ').replace(/[
 const getLeaders  = r => parseInt(g(r, 'จำนวนแกนนำโครงการ (คน)', 'จำนวนแกนนำ')) || 0;
 const getTargetP  = r => parseInt(g(r, 'จำนวนกลุ่มเป้าหมายเข้าร่วมโครงการ (คน)', 'จำนวนกลุ่มเป้าหมายเข้า\nร่วมโครงการ\n(คน)')) || 0;
 const getTargetG  = r => parseInt(g(r, 'จำนวนกลุ่มเป้าหมายเข้าร่วมโครงการ (กี่กลุ่มองค์กร)', 'จำนวนกลุ่มเป้า\nหมายเข้าร่วม\nโครงการ\n(กี่กลุ่มองค์กร)')) || 0;
-const getProgress = r => parseInt(g(r, 'ประเมินการดำเนินกิจกรรมของโครงการ (เปอร์เซ็นต์ %)', 'ประเมินการดำเนิน\nกิจกรรมของโครงการ\n(เปอร์เซ็นต์ %)')) || 0;
+const getProgress   = r => parseInt(g(r, 'ประเมินการดำเนินกิจกรรมของโครงการ (เปอร์เซ็นต์ %)', 'ประเมินการดำเนิน\nกิจกรรมของโครงการ\n(เปอร์เซ็นต์ %)')) || 0;
+const getRowNo      = r => g(r, 'ที่');
+
+// ประเภทโครงการ: งบ ≤ 70,000 = ทดลอง, งบ > 70,000 = รูปธรรม
+const getProjectType = budget => budget > 0 && budget <= 70000 ? 'ทดลอง' : budget > 70000 ? 'รูปธรรม' : '-';
+const TYPE_COLOR = { 'ทดลอง': '#F97316', 'รูปธรรม': '#1B3A8C' };
 
 // ─── SVG PIE ──────────────────────────────────────────────────────────────────
 function PieChart({ data, size = 160 }) {
@@ -258,10 +263,11 @@ export default function Dashboard() {
 
   // Table data
   const projectRows = filtered.map((r,i)=>({
-    no:i+1, name:getProject(r), region:getRegion(r), subReg:getSubReg(r),
+    no:i+1, rowNo:getRowNo(r), name:getProject(r), region:getRegion(r), subReg:getSubReg(r),
     province:getProvince(r), issue:getIssue(r), status:getStatus(r),
     budget:getBudget(r), leaders:getLeaders(r), targetP:getTargetP(r), targetG:getTargetG(r),
     progress:getProgress(r), mentor:getMentor(r), lat:getLat(r), lon:getLon(r),
+    type: getProjectType(getBudget(r)),
   }));
 
   const mentorRows = mentorSet.map((m,i)=>{
@@ -505,57 +511,70 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* ── Row 4: Project table (short) ── */}
+                {/* ── Row 4: Project type table ── */}
                 <div className="bg-white rounded-2xl shadow p-4">
                   <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
                     <h3 className="font-extrabold text-sm text-gray-700">
-                      📁 รายชื่อโครงการ ({filtered.length} โครงการ)
+                      📋 รายชื่อโครงการ &amp; ประเภทโครงการ
                     </h3>
-                    <button onClick={()=>setPage('projects')}
-                      className="text-xs text-[#1B3A8C] font-semibold hover:underline">
-                      ดูทั้งหมด →
-                    </button>
+                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                      <span>
+                        <span className="inline-block w-2.5 h-2.5 rounded-sm mr-1 align-middle" style={{background:'#F97316'}}/>
+                        ทดลอง (≤60,000)
+                      </span>
+                      <span>
+                        <span className="inline-block w-2.5 h-2.5 rounded-sm mr-1 align-middle" style={{background:'#1B3A8C'}}/>
+                        รูปธรรม (100,000)
+                      </span>
+                      <button onClick={()=>setPage('projects')}
+                        className="text-[#1B3A8C] font-semibold hover:underline ml-2">
+                        ดูทั้งหมด →
+                      </button>
+                    </div>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto" style={{maxHeight:380, overflowY:'auto'}}>
                     <table className="w-full text-xs">
-                      <thead>
-                        <tr style={{background:'#C8102E'}}>
-                          {['ที่','ชื่อโครงการ','ภาค','จังหวัด','ประเด็น','แกนนำ','พี่เลี้ยง'].map(h=>(
-                            <th key={h} className="text-white px-2 py-2 text-left whitespace-nowrap first:rounded-tl-lg last:rounded-tr-lg">{h}</th>
-                          ))}
+                      <thead className="sticky top-0">
+                        <tr style={{background:'#1B3A8C'}}>
+                          <th className="text-white px-3 py-2 text-center w-10 rounded-tl-lg">ที่</th>
+                          <th className="text-white px-3 py-2 text-left">ชื่อโครงการ</th>
+                          <th className="text-white px-3 py-2 text-center w-24 rounded-tr-lg">ประเภทโครงการ</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {projectRows.slice(0,15).map((p,i)=>(
-                          <tr key={i} className={`${i%2===0?'bg-gray-50':'bg-white'} hover:bg-red-50 transition-colors`}>
-                            <td className="px-2 py-1.5 text-gray-400 text-center">{p.no}</td>
-                            <td className="px-2 py-1.5 font-medium max-w-[200px]">
-                              <div className="truncate text-gray-800" title={p.name}>{p.name}</div>
+                        {projectRows.map((p,i)=>(
+                          <tr key={i} className={`${i%2===0?'bg-gray-50':'bg-white'} hover:bg-blue-50 transition-colors`}>
+                            <td className="px-3 py-1.5 text-center text-gray-500 font-medium">
+                              {p.rowNo || p.no}
                             </td>
-                            <td className="px-2 py-1.5">
-                              <Badge text={p.region} color={REGION_COLORS[p.region]??'#94A3B8'}/>
+                            <td className="px-3 py-1.5 font-medium text-gray-800">
+                              <div className="truncate max-w-[420px] md:max-w-none" title={p.name}>{p.name}</div>
                             </td>
-                            <td className="px-2 py-1.5 text-gray-600 whitespace-nowrap">{p.province}</td>
-                            <td className="px-2 py-1.5 max-w-[100px]">
-                              <div className="truncate text-gray-500" title={p.issue}>{p.issue}</div>
+                            <td className="px-3 py-1.5 text-center">
+                              {p.type !== '-' && (
+                                <span className="inline-block px-2.5 py-0.5 rounded-full text-white text-xs font-bold whitespace-nowrap"
+                                  style={{background: TYPE_COLOR[p.type] ?? '#94A3B8'}}>
+                                  {p.type}
+                                </span>
+                              )}
                             </td>
-                            <td className="px-2 py-1.5 text-center font-bold text-[#F97316]">{p.leaders||'-'}</td>
-                            <td className="px-2 py-1.5 text-gray-600 truncate max-w-[100px]">{p.mentor}</td>
                           </tr>
                         ))}
                         {projectRows.length===0&&(
-                          <tr><td colSpan="7" className="text-center py-8 text-gray-400">ไม่พบโครงการ</td></tr>
+                          <tr><td colSpan="3" className="text-center py-8 text-gray-400">ไม่พบโครงการ</td></tr>
                         )}
                       </tbody>
                     </table>
-                    {projectRows.length>15&&(
-                      <p className="text-center text-xs text-gray-400 mt-2">
-                        แสดง 15 จาก {projectRows.length} โครงการ —{' '}
-                        <button onClick={()=>setPage('projects')} className="text-[#1B3A8C] font-semibold hover:underline">
-                          ดูทั้งหมด
-                        </button>
-                      </p>
-                    )}
+                  </div>
+                  {/* summary counts */}
+                  <div className="mt-3 flex gap-4 text-xs text-gray-500 pt-2 border-t border-gray-100">
+                    <span>รวม <strong className="text-gray-800">{projectRows.length}</strong> โครงการ</span>
+                    <span className="text-[#F97316] font-semibold">
+                      ทดลอง: {projectRows.filter(p=>p.type==='ทดลอง').length}
+                    </span>
+                    <span className="text-[#1B3A8C] font-semibold">
+                      รูปธรรม: {projectRows.filter(p=>p.type==='รูปธรรม').length}
+                    </span>
                   </div>
                 </div>
 
