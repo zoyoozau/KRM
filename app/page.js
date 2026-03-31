@@ -215,6 +215,7 @@ export default function Dashboard(){
   const[menuOpen,setMenuOpen]=useState(false);
   const[search,setSearch]=useState('');
   const[mentorPage,setMentorPage]=useState(0);
+  const[mentorFilter,setMentorFilter]=useState('');
 
   useEffect(()=>{
     fetch(CSV_URL)
@@ -226,7 +227,8 @@ export default function Dashboard(){
   const allProvinces=useMemo(()=>[...new Set(rows.map(getProvince).filter(Boolean))].sort(),[rows]);
   const allIssues=useMemo(()=>[...new Set(rows.map(getIssue).filter(Boolean))].sort(),[rows]);
 
-  const filtered=useMemo(()=>rows.filter(r=>{
+  // filteredBase: กรองทุกอย่างยกเว้น mentorFilter — ใช้สร้างตารางพี่เลี้ยง
+  const filteredBase=useMemo(()=>rows.filter(r=>{
     if(region!=='ทั้งหมด'&&getRegion(r)!==region)return false;
     if(province!=='ทั้งหมด'&&getProvince(r)!==province)return false;
     if(issue!=='ทั้งหมด'&&getIssue(r)!==issue)return false;
@@ -234,10 +236,14 @@ export default function Dashboard(){
     return true;
   }),[rows,region,province,issue,search]);
 
+  // filtered: กรองรวม mentorFilter ด้วย — ใช้ KPI, charts, project table
+  const filtered=useMemo(()=>mentorFilter?filteredBase.filter(r=>getMentor(r)===mentorFilter):filteredBase,[filteredBase,mentorFilter]);
+
   const totalLeaders=filtered.reduce((s,r)=>s+getLeaders(r),0);
   const totalTargetP=filtered.reduce((s,r)=>s+getTargetP(r),0);
   const totalTargetG=filtered.reduce((s,r)=>s+getTargetG(r),0);
-  const mentorSet=[...new Set(filtered.map(getMentor).filter(Boolean))];
+  // mentorSet ใช้ filteredBase (ไม่กรองพี่เลี้ยง) — ให้ตารางพี่เลี้ยงแสดงครบเสมอ
+  const mentorSet=[...new Set(filteredBase.map(getMentor).filter(Boolean))];
 
   // pie chart ใช้ทุกแถว (ไม่ filter) เพื่อให้วงกลมแสดงครบทุกภาคเสมอ
   // การ filter ทำหน้าที่ highlight ชิ้นที่ active เท่านั้น
@@ -268,7 +274,7 @@ export default function Dashboard(){
   }));
 
   const mentorRows=mentorSet.map((m,i)=>{
-    const ps=filtered.filter(r=>getMentor(r)===m);
+    const ps=filteredBase.filter(r=>getMentor(r)===m); // ใช้ filteredBase เพื่อแสดงครบ
     const nick=ps.length>0?getMentorNick(ps[0]):m;
     return{no:i+1,name:m,nick,region:getRegion(ps[0]||{}),count:ps.length,
       provinces:[...new Set(ps.map(getProvince))].join(', '),
@@ -284,7 +290,8 @@ export default function Dashboard(){
   const mentorFrom=mentorRows.length>0?safeMP*MENTOR_PER_PAGE+1:0;
   const mentorTo=Math.min((safeMP+1)*MENTOR_PER_PAGE,mentorRows.length);
 
-  const changeRegion=val=>{setFadeKey(k=>k+1);setRegion(val);setProvince('ทั้งหมด');setMentorPage(0);};
+  const changeRegion=val=>{setFadeKey(k=>k+1);setRegion(val);setProvince('ทั้งหมด');setMentorFilter('');setMentorPage(0);};
+  const changeMentor=name=>{setFadeKey(k=>k+1);setMentorFilter(prev=>prev===name?'':name);setMentorPage(0);};
 
   return(
     <div className="min-h-screen flex flex-col bg-white">
@@ -424,7 +431,15 @@ export default function Dashboard(){
                       <span className="px-2 text-gray-400 flex items-center pointer-events-none text-xs">▾</span>
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-gray-800 mb-1.5">รายชื่อพี่เลี้ยง</p>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-sm font-bold text-gray-800">รายชื่อพี่เลี้ยง</p>
+                        {mentorFilter&&(
+                          <button onClick={()=>changeMentor(mentorFilter)}
+                            className="flex items-center gap-1 text-xs font-semibold text-[#1B3A8C] bg-[#1B3A8C]/10 px-2 py-0.5 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors">
+                            ✕ {mentorRows.find(m=>m.name===mentorFilter)?.nick||mentorFilter}
+                          </button>
+                        )}
+                      </div>
                       <div className="border border-gray-200 rounded overflow-hidden">
                         <table className="w-full text-xs">
                           <thead>
@@ -435,20 +450,30 @@ export default function Dashboard(){
                             </tr>
                           </thead>
                           <tbody>
-                            {pagedMentors.map((m,i)=>(
-                              <tr key={i} className={`border-b border-gray-100 last:border-0 ${i%2===0?'bg-white':'bg-gray-50'}`}>
-                                <td className="px-2 py-1.5 text-gray-400 text-right">{mentorFrom+i}.</td>
-                                <td className="px-2 py-1.5 font-semibold text-gray-800" title={m.name}>{m.nick}</td>
-                                <td className="px-2 py-1.5 text-gray-600">{m.region}</td>
-                              </tr>
-                            ))}
+                            {pagedMentors.map((m,i)=>{
+                              const isActive=mentorFilter===m.name;
+                              return(
+                                <tr key={i} onClick={()=>changeMentor(m.name)}
+                                  className={`border-b border-gray-100 last:border-0 cursor-pointer transition-all duration-150
+                                    ${isActive?'bg-[#1B3A8C] text-white':i%2===0?'bg-white hover:bg-blue-50':'bg-gray-50 hover:bg-blue-50'}`}>
+                                  <td className={`px-2 py-1.5 text-right ${isActive?'text-blue-200':'text-gray-400'}`}>{mentorFrom+i}.</td>
+                                  <td className={`px-2 py-1.5 font-semibold ${isActive?'text-white':'text-gray-800'}`} title={m.name}>
+                                    {isActive&&<span className="mr-1 opacity-80">👤</span>}{m.nick}
+                                  </td>
+                                  <td className={`px-2 py-1.5 ${isActive?'text-blue-200':'text-gray-600'}`}>{m.region}</td>
+                                </tr>
+                              );
+                            })}
                             {pagedMentors.length===0&&(
                               <tr><td colSpan="3" className="text-center py-6 text-gray-400">ไม่มีข้อมูล</td></tr>
                             )}
                           </tbody>
                         </table>
                       </div>
-                      <div className="flex items-center justify-end gap-2 mt-1.5 text-xs text-gray-500">
+                      <div className="flex items-center justify-between mt-1.5 text-xs text-gray-400">
+                        <span>{mentorFilter?'':'คลิกชื่อเพื่อกรองข้อมูล'}</span>
+                      </div>
+                      <div className="flex items-center justify-end gap-2 mt-0.5 text-xs text-gray-500">
                         <span className="font-medium">{mentorFrom} - {mentorTo} / {mentorRows.length}</span>
                         <button onClick={()=>setMentorPage(p=>Math.max(0,p-1))} disabled={safeMP===0}
                           className="w-6 h-6 border border-gray-300 rounded flex items-center justify-center disabled:opacity-30 hover:bg-gray-100">‹</button>
