@@ -653,10 +653,18 @@ export default function Dashboard(){
                         <ProgressHistogram data={histData}/>
                       </div>
                     </div>
-                    {/* Right: region breakdown table */}
+                    {/* Right: region breakdown table — คลิกเพื่อ filter */}
                     <div className="bg-white rounded-xl shadow p-6">
-                      <h3 className="font-bold text-gray-800 mb-1 text-base leading-snug">โครงการที่น่าสนใจ/ทำสื่อ/ถอดบทเรียน</h3>
-                      <p className="text-xs text-gray-400 mb-4">จำแนกตามภาค</p>
+                      <div className="flex items-start justify-between mb-1">
+                        <h3 className="font-bold text-gray-800 text-base leading-snug">โครงการที่น่าสนใจ/ทำสื่อ/ถอดบทเรียน</h3>
+                        {region!=='ทั้งหมด'&&(
+                          <button onClick={()=>changeRegion('ทั้งหมด')}
+                            className="ml-2 shrink-0 flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-[#1B3A8C]/10 text-[#1B3A8C] hover:bg-red-50 hover:text-red-500 transition-colors whitespace-nowrap">
+                            ✕ {region}
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 mb-4">{region==='ทั้งหมด'?'คลิกแถวเพื่อกรองข้อมูล':'กำลังแสดงเฉพาะ '+region}</p>
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b-2 border-gray-200">
@@ -671,16 +679,27 @@ export default function Dashboard(){
                             const dev=rs.filter(isDev).length;
                             const intr=rs.filter(isInt).length;
                             if(!dev&&!intr)return null;
+                            const isActive=region===reg;
+                            const regColor=REGION_COLORS[reg]??'#555';
                             return(
-                              <tr key={reg} className="border-b border-gray-100">
-                                <td className="py-2.5 pr-4 font-semibold whitespace-nowrap" style={{color:REGION_COLORS[reg]}}>{reg}</td>
-                                <td className="py-2.5 pl-2 font-bold text-gray-800 w-10 text-right">{dev||''}</td>
-                                <td className="py-2.5 pr-3">
-                                  {dev>0&&<div className="h-3.5 rounded" style={{width:`${Math.round((dev/maxBar)*100)}px`,background:'#22D3EE',minWidth:4}}/>}
+                              <tr key={reg}
+                                onClick={()=>changeRegion(isActive?'ทั้งหมด':reg)}
+                                className={`border-b border-gray-100 cursor-pointer transition-all duration-150
+                                  ${isActive?'bg-gray-50':'hover:bg-gray-50'}`}
+                                style={isActive?{borderLeft:`3px solid ${regColor}`,paddingLeft:2}:{}}>
+                                <td className="py-2.5 pr-4 font-semibold whitespace-nowrap">
+                                  <div className="flex items-center gap-1.5">
+                                    {isActive&&<span className="w-2 h-2 rounded-full shrink-0" style={{background:regColor}}/>}
+                                    <span style={{color:isActive?regColor:'#374151'}}>{reg}</span>
+                                  </div>
                                 </td>
-                                <td className="py-2.5 pl-2 font-bold text-gray-800 w-10 text-right">{intr||''}</td>
+                                <td className={`py-2.5 pl-2 font-bold w-10 text-right ${isActive?'text-gray-900':'text-gray-700'}`}>{dev||''}</td>
+                                <td className="py-2.5 pr-3">
+                                  {dev>0&&<div className="h-3.5 rounded transition-all" style={{width:`${Math.round((dev/maxBar)*100)}px`,background:isActive?regColor:'#22D3EE',minWidth:4}}/>}
+                                </td>
+                                <td className={`py-2.5 pl-2 font-bold w-10 text-right ${isActive?'text-gray-900':'text-gray-700'}`}>{intr||''}</td>
                                 <td className="py-2.5 pr-2">
-                                  {intr>0&&<div className="h-3.5 rounded" style={{width:`${Math.round((intr/maxBar)*100)}px`,background:'#22D3EE',minWidth:4}}/>}
+                                  {intr>0&&<div className="h-3.5 rounded transition-all" style={{width:`${Math.round((intr/maxBar)*100)}px`,background:isActive?regColor:'#22D3EE',minWidth:4}}/>}
                                 </td>
                               </tr>
                             );
