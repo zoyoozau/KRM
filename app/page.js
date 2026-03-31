@@ -64,6 +64,8 @@ const getTargetP  =r=>parseInt(g(r,'จำนวนกลุ่มเป้า�
 const getTargetG  =r=>parseInt(g(r,'จำนวนกลุ่มเป้าหมายเข้าร่วมโครงการ (กี่กลุ่มองค์กร)','จำนวนกลุ่มเป้า\nหมายเข้าร่วม\nโครงการ\n(กี่กลุ่มองค์กร)'))||0;
 const getProgress =r=>parseInt(g(r,'ประเมินการดำเนินกิจกรรมของโครงการ (เปอร์เซ็นต์ %)','ประเมินการดำเนิน\nกิจกรรมของโครงการ\n(เปอร์เซ็นต์ %)'))||0;
 const getRowNo    =r=>g(r,'ที่');
+// column AX ในชีท — ค่าเช่น "พัฒนาอีกนิด", "น่าสนใจ ทำสื่อ", "เป็นโครงการที่น่าสนใจ", "ว่าง"
+const getAssess   =r=>g(r,'AX','ประเมิน','การประเมิน','จัดกลุ่มโครงการ','ถอดบทเรียน','น่าสนใจ/ทำสื่อ');
 const getProjectType=budget=>budget>0&&budget<=70000?'ทดลอง':budget>70000?'รูปธรรม':'-';
 const TYPE_COLOR={'ทดลอง':'#F97316','รูปธรรม':'#1B3A8C'};
 
@@ -630,9 +632,9 @@ export default function Dashboard(){
               const grp={};
               progRows.forEach(r=>{const p=getProgress(r);grp[p]=(grp[p]||0)+1;});
               const histData=Object.entries(grp).map(([v,c])=>({value:parseInt(v),count:c})).sort((a,b)=>a.value-b.value);
-              // classify: <=40 = พัฒนาอีกนิด, >40 = น่าสนใจ/ทำสื่อ
-              const isDev=r=>getProgress(r)>0&&getProgress(r)<=40;
-              const isInt=r=>getProgress(r)>40;
+              // classify จาก column AX ของชีท (ไม่ใช้ % อีกต่อไป)
+              const isDev=r=>{const a=getAssess(r);return a.includes('พัฒนา');};
+              const isInt=r=>{const a=getAssess(r);return a.includes('น่าสนใจ')||a.includes('เป็นโครงการ');};
               const maxBar=Math.max(...REGIONS.map(reg=>{
                 const rs=filteredBase.filter(r=>getRegion(r)===reg);
                 return Math.max(rs.filter(isDev).length,rs.filter(isInt).length);
@@ -706,6 +708,7 @@ export default function Dashboard(){
                             <th className="px-3 py-2 text-left text-gray-700 font-bold">โครงการ</th>
                             <th className="px-3 py-2 text-left text-gray-700 font-bold">ภาค</th>
                             <th className="px-3 py-2 text-left text-gray-700 font-bold w-44">ความก้าวหน้า</th>
+                            <th className="px-3 py-2 text-left text-gray-700 font-bold whitespace-nowrap">ประเมิน (AX)</th>
                             <th className="px-3 py-2 text-left text-gray-700 font-bold">พี่เลี้ยง</th>
                           </tr>
                         </thead>
@@ -713,6 +716,8 @@ export default function Dashboard(){
                           {progRows.map((r,i)=>{
                             const prog=getProgress(r);
                             const col=progColor(prog);
+                            const assess=getAssess(r);
+                            const assessCol=assess.includes('พัฒนา')?'#F97316':assess.includes('น่าสนใจ')||assess.includes('เป็นโครงการ')?'#16A34A':'#9CA3AF';
                             return(
                               <tr key={i} className={`border-b border-gray-100 ${i%2===0?'bg-white':'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
                                 <td className="px-3 py-2 text-gray-400">{getRowNo(r)||i+1}</td>
@@ -726,6 +731,7 @@ export default function Dashboard(){
                                     <span className="text-xs font-bold w-9 text-right" style={{color:col}}>{prog}%</span>
                                   </div>
                                 </td>
+                                <td className="px-3 py-2 text-xs font-semibold whitespace-nowrap" style={{color:assessCol}}>{assess||<span className="text-gray-300">-</span>}</td>
                                 <td className="px-3 py-2 text-gray-600 text-xs font-semibold">{getMentorNick(r)}</td>
                               </tr>
                             );
