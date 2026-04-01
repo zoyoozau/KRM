@@ -218,7 +218,7 @@ function ProgressHistogram({data}){
   const totalW=PL+data.length*(BW+GAP)+GAP;
   const yTicks=[0,10,20,30].filter(v=>v<=Math.ceil(max/10)*10);
   return(
-    <div className="w-full">
+    <div style={{maxWidth:totalW,width:'100%',margin:'0 auto'}}>
       <svg viewBox={`0 0 ${totalW} ${H+55}`} width="100%" style={{display:'block'}}>
         {/* Y gridlines + labels */}
         {yTicks.map(v=>{
