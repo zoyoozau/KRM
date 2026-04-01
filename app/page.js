@@ -391,6 +391,8 @@ export default function Dashboard(){
   const[fadeKey,setFadeKey]=useState(0);
   const[page,setPage]=useState('overview');
   const[menuOpen,setMenuOpen]=useState(false);
+  const[pageToast,setPageToast]=useState(null); // {icon,label} | null
+  const toastTimerRef=useRef(null);
   const[search,setSearch]=useState('');
   const[mentorPage,setMentorPage]=useState(0);
   const[mentorFilter,setMentorFilter]=useState('');
@@ -488,6 +490,15 @@ export default function Dashboard(){
 
   const changeRegion=val=>{setFadeKey(k=>k+1);setRegion(val);setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setMentorPage(0);setExpandedIdx(null);};
   const changeMentor=name=>{setMentorFilter(prev=>prev===name?'':name);setAssessFilter('');setMentorPage(0);setExpandedIdx(null);};
+
+  const showToast=p=>{
+    if(toastTimerRef.current)clearTimeout(toastTimerRef.current);
+    setPageToast({...p,phase:'in'});
+    toastTimerRef.current=setTimeout(()=>{
+      setPageToast(prev=>prev?{...prev,phase:'out'}:null);
+      setTimeout(()=>setPageToast(null),320);
+    },1400);
+  };
   // คลิก cell ในตาราง assess: filter ภาค + ประเภท พร้อมกัน
   const changeAssess=(reg,type)=>{
     setFadeKey(k=>k+1);
@@ -498,7 +509,15 @@ export default function Dashboard(){
 
   return(
     <div className="min-h-screen flex flex-col bg-white">
-      <style>{`@keyframes krmFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@keyframes krmFadeIn2{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.krm-fade{animation-duration:0.45s;animation-timing-function:cubic-bezier(.22,.68,0,1.2);animation-fill-mode:both}`}</style>
+      <style>{`
+        @keyframes krmFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes krmFadeIn2{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .krm-fade{animation-duration:0.45s;animation-timing-function:cubic-bezier(.22,.68,0,1.2);animation-fill-mode:both}
+        @keyframes toastIn{0%{opacity:0;transform:translate(-50%,-50%) scale(0.7)}60%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+        @keyframes toastOut{0%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(0.85)}}
+        .page-toast-in{animation:toastIn 0.38s cubic-bezier(.34,1.56,.64,1) forwards}
+        .page-toast-out{animation:toastOut 0.3s ease-in forwards}
+      `}</style>
 
       {/* HEADER */}
       <header style={{background:'linear-gradient(90deg,#BF8B00 0%,#FFD700 30%,#FFE44D 50%,#FFD700 70%,#BF8B00 100%)'}}>
@@ -540,20 +559,47 @@ export default function Dashboard(){
       </nav>
 
       {/* BOTTOM TAB BAR — mobile only */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#1B3A8C] border-t border-white/20 flex safe-area-bottom"
-        style={{paddingBottom:'env(safe-area-inset-bottom)'}}>
+      {/* Page name toast — mobile only */}
+      {pageToast&&(
+        <div className={`md:hidden fixed z-[60] pointer-events-none ${pageToast.phase==='in'?'page-toast-in':'page-toast-out'}`}
+          style={{top:'42%',left:'50%',transform:'translate(-50%,-50%)'}}>
+          <div style={{
+            background:'linear-gradient(135deg,rgba(27,58,140,0.97),rgba(11,30,80,0.97))',
+            backdropFilter:'blur(16px)',WebkitBackdropFilter:'blur(16px)',
+            borderRadius:24,padding:'20px 36px',
+            boxShadow:'0 24px 60px rgba(0,0,0,0.4),0 0 0 1px rgba(255,255,255,0.12)',
+            display:'flex',flexDirection:'column',alignItems:'center',gap:10,
+            minWidth:180,
+          }}>
+            <span style={{fontSize:48,lineHeight:1,filter:'drop-shadow(0 4px 8px rgba(0,0,0,0.3))'}}>{pageToast.icon}</span>
+            <span style={{color:'#fff',fontWeight:800,fontSize:16,letterSpacing:'0.02em',textAlign:'center',lineHeight:1.3}}>
+              {pageToast.label}
+            </span>
+            <div style={{width:32,height:3,background:'rgba(255,255,255,0.35)',borderRadius:4,marginTop:2}}/>
+          </div>
+        </div>
+      )}
+
+      {/* BOTTOM TAB BAR — mobile only */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex"
+        style={{background:'rgba(27,58,140,0.97)',backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderTop:'1px solid rgba(255,255,255,0.15)',paddingBottom:'env(safe-area-inset-bottom)'}}>
         {PAGES.map(p=>{
-          const tabClick=()=>{if(p.soon)return;setPage(p.id);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setProgressFilter(null);setExpandedAssessIdx(null);setFadeKey(k=>k+1);};
+          const tabClick=()=>{
+            if(p.soon)return;
+            showToast(p);
+            setPage(p.id);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setProgressFilter(null);setExpandedAssessIdx(null);setFadeKey(k=>k+1);
+          };
           const isAct=page===p.id;
           return(
             <button key={p.id} onClick={tabClick}
-              className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-all duration-200 relative active:scale-90
-                ${isAct?'text-white':'text-white/45'} ${p.soon?'opacity-40':''}`}>
-              {isAct&&<span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-white rounded-full"/>}
-              <span className={`text-xl leading-none transition-transform duration-200 ${isAct?'scale-110':''}`}>{p.icon}</span>
-              <span className={`text-[10px] leading-tight font-semibold ${isAct?'font-extrabold':''}`}
-                style={{fontSize:'9px'}}>{p.label}</span>
-              {p.soon&&<span className="absolute top-1 right-2 bg-amber-400 text-[#1B3A8C] text-[8px] font-extrabold px-1 rounded-full">soon</span>}
+              className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 relative transition-all duration-200 active:scale-90
+                ${p.soon?'opacity-40 cursor-not-allowed':''}`}
+              style={{color:isAct?'#fff':'rgba(255,255,255,0.45)'}}>
+              {/* active indicator top line */}
+              {isAct&&<span style={{position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:28,height:2.5,background:'#FFD700',borderRadius:4}}/>}
+              <span style={{fontSize:22,lineHeight:1,transform:isAct?'scale(1.15)':'scale(1)',transition:'transform 0.2s'}}>{p.icon}</span>
+              <span style={{fontSize:9,fontWeight:isAct?800:600,lineHeight:1.2,textAlign:'center'}}>{p.label}</span>
+              {p.soon&&<span style={{position:'absolute',top:4,right:4,background:'#FCD34D',color:'#1B3A8C',fontSize:7,fontWeight:800,padding:'1px 4px',borderRadius:999}}>soon</span>}
             </button>
           );
         })}
