@@ -218,9 +218,8 @@ function ProgressHistogram({data}){
   const totalW=PL+data.length*(BW+GAP)+GAP;
   const yTicks=[0,10,20,30].filter(v=>v<=Math.ceil(max/10)*10);
   return(
-    // max-w จำกัดไม่ให้กว้างเกิน 560px บนจอใหญ่
-    <div className="max-w-[560px]">
-      <svg viewBox={`0 0 ${totalW} ${H+55}`} width={totalW} style={{maxWidth:'100%',display:'block'}}>
+    <div className="w-full">
+      <svg viewBox={`0 0 ${totalW} ${H+55}`} width="100%" style={{display:'block'}}>
         {/* Y gridlines + labels */}
         {yTicks.map(v=>{
           const y=H-(v/Math.ceil(max/10)*10)*H;
@@ -663,9 +662,7 @@ export default function Dashboard(){
                     {/* Left: histogram — constrained + centered */}
                     <div className="bg-white rounded-xl shadow p-6">
                       <h3 className="font-bold text-gray-800 mb-4 text-base">ประเมินความก้าวหน้าโครงการ</h3>
-                      <div className="flex justify-center">
-                        <ProgressHistogram data={histData}/>
-                      </div>
+                      <ProgressHistogram data={histData}/>
                     </div>
                     {/* Right: region breakdown table — คลิกเพื่อ filter */}
                     <div className="bg-white rounded-xl shadow p-6">
