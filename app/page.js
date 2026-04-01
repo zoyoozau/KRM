@@ -346,7 +346,7 @@ function LeafletMap({pins,activeRegion}){
 
   return(
     <div style={{position:'relative'}}>
-      <div ref={containerRef} style={{height:'clamp(320px,60vh,600px)',width:'100%'}}/>
+      <div ref={containerRef} style={{height:'min(45vh,480px)',minHeight:280,width:'100%'}}/>
       {!ready&&(
         <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background:'#f8fafc'}}>
           <div style={{textAlign:'center'}}><div style={{fontSize:32,marginBottom:8}}>🗺️</div><div style={{color:'#94a3b8',fontSize:14}}>กำลังโหลดแผนที่...</div></div>
@@ -561,7 +561,7 @@ export default function Dashboard(){
       {/* BOTTOM TAB BAR — mobile only */}
       {/* Page name toast — mobile only */}
       {pageToast&&(
-        <div className={`md:hidden fixed z-[60] pointer-events-none ${pageToast.phase==='in'?'page-toast-in':'page-toast-out'}`}
+        <div className={`md:hidden fixed pointer-events-none ${pageToast.phase==='in'?'page-toast-in':'page-toast-out'}`} style={{zIndex:3000}}
           style={{top:'42%',left:'50%',transform:'translate(-50%,-50%)'}}>
           <div style={{
             background:'linear-gradient(135deg,rgba(27,58,140,0.97),rgba(11,30,80,0.97))',
@@ -581,8 +581,8 @@ export default function Dashboard(){
       )}
 
       {/* BOTTOM TAB BAR — mobile only */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex"
-        style={{background:'rgba(27,58,140,0.97)',backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderTop:'1px solid rgba(255,255,255,0.15)',paddingBottom:'env(safe-area-inset-bottom)'}}>
+      <div className="md:hidden fixed bottom-0 left-0 right-0 flex"
+        style={{background:'rgba(27,58,140,0.97)',backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderTop:'1px solid rgba(255,255,255,0.15)',paddingBottom:'env(safe-area-inset-bottom)',zIndex:2000}}>
         {PAGES.map(p=>{
           const tabClick=()=>{
             if(p.soon)return;
