@@ -267,6 +267,81 @@ function ProgressHistogram({data,onBarClick,activeBar}){
   );
 }
 
+// LEAFLET MAP — โหลด Leaflet จาก CDN ใน useEffect
+function LeafletMap({pins,activeRegion}){
+  const containerRef=useRef(null);
+  const mapRef=useRef(null);
+  const layerRef=useRef(null);
+  const[ready,setReady]=useState(false);
+
+  // init map ครั้งเดียว
+  useEffect(()=>{
+    let alive=true;
+    if(!document.getElementById('lfcss')){
+      const lnk=document.createElement('link');
+      lnk.id='lfcss';lnk.rel='stylesheet';
+      lnk.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(lnk);
+    }
+    const loadL=()=>new Promise((res,rej)=>{
+      if(window.L){res();return;}
+      const s=document.createElement('script');
+      s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      s.onload=res;s.onerror=rej;
+      document.head.appendChild(s);
+    });
+    loadL().then(()=>{
+      if(!alive||!containerRef.current||mapRef.current)return;
+      const L=window.L;
+      const map=L.map(containerRef.current,{center:[15.0,101.5],zoom:6,zoomControl:true});
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        attribution:'© <a href="https://openstreetmap.org">OpenStreetMap</a>',maxZoom:19
+      }).addTo(map);
+      layerRef.current=L.layerGroup().addTo(map);
+      mapRef.current=map;
+      setReady(true);
+    });
+    return()=>{alive=false;if(mapRef.current){mapRef.current.remove();mapRef.current=null;layerRef.current=null;}};
+  },[]);
+
+  // อัปเดต markers เมื่อ pins/activeRegion เปลี่ยน
+  useEffect(()=>{
+    if(!ready||!layerRef.current)return;
+    const L=window.L;
+    layerRef.current.clearLayers();
+    pins.forEach(pin=>{
+      const color=REGION_COLORS[pin.region]||'#888';
+      const isAct=activeRegion&&pin.region===activeRegion;
+      const dim=activeRegion&&!isAct;
+      const sz=isAct?14:10;
+      const icon=L.divIcon({
+        className:'',
+        html:`<div style="width:${sz}px;height:${sz}px;background:${color};border:2.5px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35);opacity:${dim?0.35:1};transition:all .2s"></div>`,
+        iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],
+      });
+      const mk=L.marker([pin.lat,pin.lon],{icon}).addTo(layerRef.current);
+      mk.bindPopup(`<div style="min-width:190px;font-family:sans-serif;line-height:1.5">
+        <div style="font-weight:700;font-size:13px;color:#1B3A8C;margin-bottom:5px">${pin.name}</div>
+        <div style="font-size:12px;color:#555">📍 ${pin.province}</div>
+        <div style="font-size:12px;color:${color};font-weight:600">🗺️ ${pin.region}</div>
+        ${pin.mentor?`<div style="font-size:12px;color:#555">👤 ${pin.mentor}</div>`:''}
+        ${pin.progress?`<div style="margin-top:6px"><div style="background:#e5e7eb;border-radius:4px;height:6px;overflow:hidden"><div style="background:${color};height:6px;width:${pin.progress}%"></div></div><div style="font-size:10px;color:#888;margin-top:2px">ความก้าวหน้า ${pin.progress}%</div></div>`:''}
+      </div>`,{maxWidth:260});
+    });
+  },[ready,pins,activeRegion]);
+
+  return(
+    <div style={{position:'relative'}}>
+      <div ref={containerRef} style={{height:'clamp(320px,60vh,600px)',width:'100%'}}/>
+      {!ready&&(
+        <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background:'#f8fafc'}}>
+          <div style={{textAlign:'center'}}><div style={{fontSize:32,marginBottom:8}}>🗺️</div><div style={{color:'#94a3b8',fontSize:14}}>กำลังโหลดแผนที่...</div></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // KPI CARD: label above + big number in colored box
 function KPICard({label,value,bg,large=true}){
   return(
@@ -869,62 +944,91 @@ export default function Dashboard(){
             })()}
 
             {/* ═══ MAPPING ═══ */}
-            {page==='mapping'&&(
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {REGIONS.map(reg=>{
-                    const cnt=filtered.filter(r=>getRegion(r)===reg).length;
-                    return(<div key={reg} className="rounded-xl text-white p-3 shadow text-center" style={{background:REGION_COLORS[reg]}}><div className="text-2xl font-extrabold">{cnt}</div><div className="text-xs font-semibold opacity-90 mt-0.5">{reg}</div></div>);
-                  })}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {REGIONS.map(reg=>{
-                    const ps=filtered.filter(r=>getRegion(r)===reg);
-                    if(!ps.length)return null;
-                    return(
-                      <div key={reg} className="bg-white rounded-2xl shadow overflow-hidden">
-                        <div className="px-4 py-3 text-white font-bold flex justify-between items-center" style={{background:REGION_COLORS[reg]}}>
-                          <span>{reg}</span><span className="bg-white/20 rounded-full px-2 py-0.5 text-sm">{ps.length}</span>
+            {page==='mapping'&&(()=>{
+              const pins=filtered.filter(r=>getLat(r)&&getLon(r)).map(r=>({
+                lat:getLat(r),lon:getLon(r),name:getProject(r),province:getProvince(r),
+                region:getRegion(r),mentor:getMentorNick(r),progress:getProgress(r),
+              }));
+              const noCoord=filtered.filter(r=>!getLat(r)||!getLon(r));
+              return(
+                <div className="space-y-4">
+                  {/* Region stat chips — clickable */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                    {REGIONS.map(reg=>{
+                      const cnt=filtered.filter(r=>getRegion(r)===reg).length;
+                      const pinCnt=pins.filter(p=>p.region===reg).length;
+                      const isAct=region===reg;
+                      return(
+                        <div key={reg} onClick={()=>changeRegion(isAct?'ทั้งหมด':reg)}
+                          className={`rounded-2xl text-white p-3 shadow-md text-center cursor-pointer select-none transition-all duration-200 active:scale-95
+                            ${isAct?'ring-4 ring-white ring-offset-2 scale-105 shadow-xl':'hover:scale-102 hover:shadow-lg'}`}
+                          style={{background:REGION_COLORS[reg]}}>
+                          <div className="text-3xl font-extrabold leading-none">{cnt}</div>
+                          <div className="text-xs font-semibold opacity-90 mt-1 leading-tight">{reg}</div>
+                          <div className="text-xs opacity-70 mt-0.5">📌 {pinCnt} หมุด</div>
                         </div>
-                        <ul className="p-3 space-y-2 max-h-64 overflow-y-auto">
-                          {ps.map((r,i)=>{
-                            const lat=getLat(r),lon=getLon(r);
-                            return(<li key={i} className="text-xs text-gray-700 border-b border-gray-100 pb-1.5 last:border-0">
-                              <div className="font-medium truncate" title={getProject(r)}>{i+1}. {getProject(r)}</div>
-                              <div className="text-gray-400 mt-0.5 flex items-center gap-2">
-                                <span>📍 {getProvince(r)}</span>
-                                {lat&&lon&&<a href={`https://maps.google.com/?q=${lat},${lon}`} target="_blank" rel="noreferrer" className="text-blue-500 underline">แผนที่</a>}
-                              </div>
-                            </li>);
-                          })}
-                        </ul>
+                      );
+                    })}
+                  </div>
+
+                  {/* Map card */}
+                  <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-gray-800">📌 แผนที่โครงการ</h3>
+                        <span className="bg-[#1B3A8C] text-white text-xs font-bold px-2 py-0.5 rounded-full">{pins.length} หมุด</span>
+                        {region!=='ทั้งหมด'&&(
+                          <button onClick={()=>changeRegion('ทั้งหมด')}
+                            className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#1B3A8C]/10 text-[#1B3A8C] hover:bg-red-50 hover:text-red-500 transition-colors">
+                            ✕ {region}
+                          </button>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-                {mapRows.length>0&&(
-                  <div className="bg-white rounded-2xl shadow p-4">
-                    <h3 className="font-bold text-gray-800 mb-3">📌 โครงการที่มีพิกัด ({mapRows.length} โครงการ)</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead><tr className="bg-gray-100">{['ชื่อโครงการ','จังหวัด','Latitude','Longitude','Google Maps'].map(h=><th key={h} className="px-2 py-1.5 text-left">{h}</th>)}</tr></thead>
-                        <tbody>
-                          {mapRows.map((r,i)=>(
-                            <tr key={i} className={i%2===0?'bg-gray-50':'bg-white'}>
-                              <td className="px-2 py-1.5 max-w-xs truncate" title={r.name}>{r.name}</td>
-                              <td className="px-2 py-1.5">{r.province}</td>
-                              <td className="px-2 py-1.5 font-mono">{r.lat}</td>
-                              <td className="px-2 py-1.5 font-mono">{r.lon}</td>
-                              <td className="px-2 py-1.5"><a href={`https://maps.google.com/?q=${r.lat},${r.lon}`} target="_blank" rel="noreferrer" className="bg-[#1B3A8C] text-white rounded px-2 py-0.5 hover:bg-[#0F2663] transition-colors">📍 ดูแผนที่</a></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      {noCoord.length>0&&<span className="text-xs text-amber-500">⚠️ {noCoord.length} โครงการไม่มีพิกัด</span>}
+                    </div>
+                    <LeafletMap pins={pins} activeRegion={region!=='ทั้งหมด'?region:null}/>
+                    {/* Legend */}
+                    <div className="px-4 py-3 border-t border-gray-100 flex flex-wrap gap-x-4 gap-y-2">
+                      {REGIONS.filter(reg=>pins.some(p=>p.region===reg)).map(reg=>(
+                        <button key={reg} onClick={()=>changeRegion(region===reg?'ทั้งหมด':reg)}
+                          className={`flex items-center gap-1.5 text-xs transition-all ${region===reg?'font-bold':'text-gray-600 hover:text-gray-900'}`}>
+                          <span className="w-3 h-3 rounded-full shrink-0" style={{background:REGION_COLORS[reg],outline:region===reg?`2px solid ${REGION_COLORS[reg]}`:''}}/>
+                          {reg} ({pins.filter(p=>p.region===reg).length})
+                        </button>
+                      ))}
+                      <span className="text-xs text-gray-400 ml-auto">คลิกหมุดเพื่อดูรายละเอียด</span>
                     </div>
                   </div>
-                )}
-              </div>
-            )}
+
+                  {/* No-coord table */}
+                  {noCoord.length>0&&(
+                    <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <h3 className="font-bold text-gray-800 text-sm">⚠️ โครงการที่ยังไม่มีพิกัด ({noCoord.length})</h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead><tr className="bg-gray-50 border-b border-gray-200">
+                            <th className="px-3 py-2 text-left text-gray-500 font-semibold">โครงการ</th>
+                            <th className="px-3 py-2 text-left text-gray-500 font-semibold">จังหวัด</th>
+                            <th className="px-3 py-2 text-left text-gray-500 font-semibold">ภาค</th>
+                          </tr></thead>
+                          <tbody>
+                            {noCoord.map((r,i)=>(
+                              <tr key={i} className={`border-b border-gray-100 ${i%2===0?'bg-white':'bg-gray-50'}`}>
+                                <td className="px-3 py-2 text-gray-700">{getProject(r)}</td>
+                                <td className="px-3 py-2 text-gray-500">📍 {getProvince(r)}</td>
+                                <td className="px-3 py-2"><Badge text={getRegion(r)} color={REGION_COLORS[getRegion(r)]??'#94A3B8'}/></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </>
         )}
       </main>
