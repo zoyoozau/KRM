@@ -391,8 +391,6 @@ export default function Dashboard(){
   const[fadeKey,setFadeKey]=useState(0);
   const[page,setPage]=useState('overview');
   const[menuOpen,setMenuOpen]=useState(false);
-  const[pageToast,setPageToast]=useState(null); // {icon,label} | null
-  const toastTimerRef=useRef(null);
   const[search,setSearch]=useState('');
   const[mentorPage,setMentorPage]=useState(0);
   const[mentorFilter,setMentorFilter]=useState('');
@@ -491,14 +489,6 @@ export default function Dashboard(){
   const changeRegion=val=>{setFadeKey(k=>k+1);setRegion(val);setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setMentorPage(0);setExpandedIdx(null);};
   const changeMentor=name=>{setMentorFilter(prev=>prev===name?'':name);setAssessFilter('');setMentorPage(0);setExpandedIdx(null);};
 
-  const showToast=p=>{
-    if(toastTimerRef.current)clearTimeout(toastTimerRef.current);
-    setPageToast({...p,phase:'in'});
-    toastTimerRef.current=setTimeout(()=>{
-      setPageToast(prev=>prev?{...prev,phase:'out'}:null);
-      setTimeout(()=>setPageToast(null),320);
-    },1400);
-  };
   // คลิก cell ในตาราง assess: filter ภาค + ประเภท พร้อมกัน
   const changeAssess=(reg,type)=>{
     setFadeKey(k=>k+1);
@@ -508,15 +498,11 @@ export default function Dashboard(){
   };
 
   return(
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen bg-white">
       <style>{`
         @keyframes krmFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         @keyframes krmFadeIn2{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         .krm-fade{animation-duration:0.45s;animation-timing-function:cubic-bezier(.22,.68,0,1.2);animation-fill-mode:both}
-        @keyframes toastIn{0%{opacity:0;transform:translate(-50%,-50%) scale(0.7)}60%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
-        @keyframes toastOut{0%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(0.85)}}
-        .page-toast-in{animation:toastIn 0.38s cubic-bezier(.34,1.56,.64,1) forwards}
-        .page-toast-out{animation:toastOut 0.3s ease-in forwards}
       `}</style>
 
       {/* HEADER */}
@@ -546,7 +532,6 @@ export default function Dashboard(){
             {PAGES.map(p=>{
               const navClick=()=>{
                 if(p.soon)return;
-                showToast(p);
                 setPage(p.id);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setProgressFilter(null);setExpandedAssessIdx(null);setFadeKey(k=>k+1);
               };
               const isAct=page===p.id;
@@ -565,26 +550,8 @@ export default function Dashboard(){
         </div>
       </nav>
 
-      {/* TOAST — กลางจอ เมื่อเปลี่ยนหน้า */}
-      {pageToast&&(
-        <div className={`fixed pointer-events-none ${pageToast.phase==='in'?'page-toast-in':'page-toast-out'}`}
-          style={{top:'45%',left:'50%',zIndex:9999}}>
-          <div style={{
-            background:'linear-gradient(135deg,rgba(27,58,140,0.96),rgba(11,30,80,0.96))',
-            backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',
-            borderRadius:28,padding:'24px 40px',
-            boxShadow:'0 32px 80px rgba(0,0,0,0.45),0 0 0 1px rgba(255,255,255,0.12)',
-            display:'flex',flexDirection:'column',alignItems:'center',gap:12,minWidth:200,
-          }}>
-            <span style={{fontSize:52,lineHeight:1,filter:'drop-shadow(0 4px 10px rgba(0,0,0,0.3))'}}>{pageToast.icon}</span>
-            <span style={{color:'#fff',fontWeight:800,fontSize:17,letterSpacing:'0.02em',textAlign:'center',lineHeight:1.3}}>{pageToast.label}</span>
-            <div style={{width:36,height:3,background:'rgba(255,213,0,0.6)',borderRadius:4}}/>
-          </div>
-        </div>
-      )}
-
       {/* MAIN */}
-      <main className="flex-1 max-w-screen-2xl mx-auto w-full px-3 py-4">
+      <main className="max-w-screen-2xl mx-auto w-full px-3 py-4">
 
         {loading&&(
           <div className="flex justify-center items-center h-64">
