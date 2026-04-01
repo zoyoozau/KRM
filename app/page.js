@@ -558,44 +558,44 @@ export default function Dashboard(){
                         )}
                       </div>
                       <div className="border border-gray-200 rounded overflow-hidden">
+                        {/* sticky header */}
                         <table className="w-full text-xs">
-                          <thead>
+                          <thead className="sticky top-0 z-10">
                             <tr className="bg-gray-100 border-b border-gray-200">
                               <th className="px-2 py-2 text-left text-gray-500 font-semibold w-8"></th>
-                              <th className="px-2 py-2 text-left text-gray-700 font-bold">พี่เลี้ยง <span className="text-gray-400 font-normal">↑</span></th>
-                              <th className="px-2 py-2 text-left text-gray-700 font-bold">ภาค <span className="text-gray-400 font-normal">↑</span></th>
+                              <th className="px-2 py-2 text-left text-gray-700 font-bold">พี่เลี้ยง</th>
+                              <th className="px-2 py-2 text-left text-gray-700 font-bold">ภาค</th>
                             </tr>
                           </thead>
-                          <tbody>
-                            {pagedMentors.map((m,i)=>{
-                              const isActive=mentorFilter===m.name;
-                              return(
-                                <tr key={i} onClick={()=>changeMentor(m.name)}
-                                  className={`border-b border-gray-100 last:border-0 cursor-pointer transition-all duration-150
-                                    ${isActive?'bg-[#1B3A8C] text-white':i%2===0?'bg-white hover:bg-blue-50':'bg-gray-50 hover:bg-blue-50'}`}>
-                                  <td className={`px-2 py-1.5 text-right ${isActive?'text-blue-200':'text-gray-400'}`}>{mentorFrom+i}.</td>
-                                  <td className={`px-2 py-1.5 font-semibold ${isActive?'text-white':'text-gray-800'}`} title={m.name}>
-                                    {isActive&&<span className="mr-1 opacity-80">👤</span>}{m.nick}
-                                  </td>
-                                  <td className={`px-2 py-1.5 ${isActive?'text-blue-200':'text-gray-600'}`}>{m.region}</td>
-                                </tr>
-                              );
-                            })}
-                            {pagedMentors.length===0&&(
-                              <tr><td colSpan="3" className="text-center py-6 text-gray-400">ไม่มีข้อมูล</td></tr>
-                            )}
-                          </tbody>
                         </table>
+                        {/* scrollable body */}
+                        <div className="overflow-y-auto" style={{maxHeight:'320px',WebkitOverflowScrolling:'touch'}}>
+                          <table className="w-full text-xs">
+                            <tbody>
+                              {mentorRows.map((m,i)=>{
+                                const isActive=mentorFilter===m.name;
+                                return(
+                                  <tr key={i} onClick={()=>changeMentor(m.name)}
+                                    className={`border-b border-gray-100 last:border-0 cursor-pointer transition-all duration-150 active:opacity-70
+                                      ${isActive?'bg-[#1B3A8C] text-white':i%2===0?'bg-white hover:bg-blue-50':'bg-gray-50 hover:bg-blue-50'}`}>
+                                    <td className={`px-2 py-2.5 text-right ${isActive?'text-blue-200':'text-gray-400'}`}>{i+1}.</td>
+                                    <td className={`px-2 py-2.5 font-semibold ${isActive?'text-white':'text-gray-800'}`} title={m.name}>
+                                      {isActive&&<span className="mr-1 opacity-80">👤</span>}{m.nick}
+                                    </td>
+                                    <td className={`px-2 py-2.5 ${isActive?'text-blue-200':'text-gray-600'}`}>{m.region}</td>
+                                  </tr>
+                                );
+                              })}
+                              {mentorRows.length===0&&(
+                                <tr><td colSpan="3" className="text-center py-6 text-gray-400">ไม่มีข้อมูล</td></tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                       <div className="flex items-center justify-between mt-1.5 text-xs text-gray-400">
                         <span>{mentorFilter?'':'คลิกชื่อเพื่อกรองข้อมูล'}</span>
-                      </div>
-                      <div className="flex items-center justify-end gap-2 mt-0.5 text-xs text-gray-500">
-                        <span className="font-medium">{mentorFrom} - {mentorTo} / {mentorRows.length}</span>
-                        <button onClick={()=>setMentorPage(p=>Math.max(0,p-1))} disabled={safeMP===0}
-                          className="w-6 h-6 border border-gray-300 rounded flex items-center justify-center disabled:opacity-30 hover:bg-gray-100">‹</button>
-                        <button onClick={()=>setMentorPage(p=>Math.min(mentorPageTotal-1,p+1))} disabled={safeMP>=mentorPageTotal-1}
-                          className="w-6 h-6 border border-gray-300 rounded flex items-center justify-center disabled:opacity-30 hover:bg-gray-100">›</button>
+                        <span className="font-medium text-gray-500">{mentorRows.length} คน</span>
                       </div>
                     </div>
                   </div>
