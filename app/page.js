@@ -308,6 +308,14 @@ export default function Dashboard(){
     return true;
   }),[rows,region,province,issue,search]);
 
+  // assessTableBase: กรองทุกอย่างยกเว้น region — ใช้สำหรับตาราง assess (แสดงทุกภาคเสมอ)
+  const assessTableBase=useMemo(()=>rows.filter(r=>{
+    if(province!=='ทั้งหมด'&&getProvince(r)!==province)return false;
+    if(issue!=='ทั้งหมด'&&getIssue(r)!==issue)return false;
+    if(search){const q=search.toLowerCase();if(!getProject(r).toLowerCase().includes(q)&&!getMentor(r).toLowerCase().includes(q)&&!getProvince(r).toLowerCase().includes(q))return false;}
+    return true;
+  }),[rows,province,issue,search]);
+
   // filtered: กรองรวม mentorFilter + assessFilter — ใช้ KPI, charts, project table
   const filtered=useMemo(()=>{
     let f=filteredBase;
@@ -650,11 +658,11 @@ export default function Dashboard(){
               const isDev=r=>{const a=getAssess(r);return a.includes('พัฒนา');};
               const isInt=r=>{const a=getAssess(r);return a.includes('น่าสนใจ')||a.includes('เป็นโครงการ');};
               const maxBar=Math.max(...REGIONS.map(reg=>{
-                const rs=filteredBase.filter(r=>getRegion(r)===reg);
+                const rs=assessTableBase.filter(r=>getRegion(r)===reg);
                 return Math.max(rs.filter(isDev).length,rs.filter(isInt).length);
               }),1);
-              const totalDev=filteredBase.filter(isDev).length;
-              const totalInt=filteredBase.filter(isInt).length;
+              const totalDev=assessTableBase.filter(isDev).length;
+              const totalInt=assessTableBase.filter(isInt).length;
               return(
                 <div className="space-y-4">
                   {/* TOP ROW — histogram left, breakdown table right */}
@@ -690,7 +698,7 @@ export default function Dashboard(){
                         </thead>
                         <tbody>
                           {REGIONS.map(reg=>{
-                            const rs=filteredBase.filter(r=>getRegion(r)===reg);
+                            const rs=assessTableBase.filter(r=>getRegion(r)===reg);
                             const dev=rs.filter(isDev).length;
                             const intr=rs.filter(isInt).length;
                             if(!dev&&!intr)return null;
@@ -698,9 +706,15 @@ export default function Dashboard(){
                             const isDevActive=region===reg&&assessFilter==='dev';
                             const isIntActive=region===reg&&assessFilter==='int';
                             const isRowActive=region===reg&&!assessFilter;
+                            // dim แถวที่ไม่ใช่ภาคที่ active (เมื่อมี filter อยู่)
+                            const hasFilter=region!=='ทั้งหมด'||assessFilter;
+                            const isDimmed=hasFilter&&!isDevActive&&!isIntActive&&!isRowActive;
                             return(
-                              <tr key={reg} className={`border-b border-gray-100 transition-all duration-150 ${isRowActive||isDevActive||isIntActive?'bg-gray-50':''}`}
-                                style={(isDevActive||isIntActive||isRowActive)?{borderLeft:`3px solid ${regColor}`}:{}}>
+                              <tr key={reg} className={`border-b border-gray-100 transition-all duration-200 ${isRowActive||isDevActive||isIntActive?'bg-gray-50':''}`}
+                                style={{
+                                  opacity:isDimmed?0.35:1,
+                                  ...(isDevActive||isIntActive||isRowActive)?{borderLeft:`3px solid ${regColor}`}:{}
+                                }}>
                                 {/* ชื่อภาค — คลิก filter แค่ภาค */}
                                 <td className="py-2.5 pr-3 cursor-pointer select-none"
                                   onClick={()=>changeRegion(isRowActive?'ทั้งหมด':reg)}>
