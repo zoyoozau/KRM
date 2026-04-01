@@ -320,13 +320,27 @@ function LeafletMap({pins,activeRegion}){
         iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],
       });
       const mk=L.marker([pin.lat,pin.lon],{icon}).addTo(layerRef.current);
-      mk.bindPopup(`<div style="min-width:190px;font-family:sans-serif;line-height:1.5">
+      const gUrl=`https://www.google.com/maps?q=${pin.lat},${pin.lon}`;
+      const aUrl=`maps://maps.apple.com/?q=${pin.lat},${pin.lon}`;
+      mk.bindPopup(`<div style="min-width:200px;font-family:sans-serif;line-height:1.5">
         <div style="font-weight:700;font-size:13px;color:#1B3A8C;margin-bottom:5px">${pin.name}</div>
         <div style="font-size:12px;color:#555">📍 ${pin.province}</div>
         <div style="font-size:12px;color:${color};font-weight:600">🗺️ ${pin.region}</div>
         ${pin.mentor?`<div style="font-size:12px;color:#555">👤 ${pin.mentor}</div>`:''}
         ${pin.progress?`<div style="margin-top:6px"><div style="background:#e5e7eb;border-radius:4px;height:6px;overflow:hidden"><div style="background:${color};height:6px;width:${pin.progress}%"></div></div><div style="font-size:10px;color:#888;margin-top:2px">ความก้าวหน้า ${pin.progress}%</div></div>`:''}
-      </div>`,{maxWidth:260});
+        <div style="margin-top:10px;display:flex;gap:6px">
+          <a href="${gUrl}" target="_blank" rel="noreferrer"
+            style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 8px;background:#1B3A8C;color:#fff;border-radius:8px;font-size:11px;font-weight:600;text-decoration:none">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            Google Maps
+          </a>
+          <a href="${aUrl}" target="_blank" rel="noreferrer"
+            style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 8px;background:#555;color:#fff;border-radius:8px;font-size:11px;font-weight:600;text-decoration:none">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            Apple Maps
+          </a>
+        </div>
+      </div>`,{maxWidth:280});
     });
   },[ready,pins,activeRegion]);
 
