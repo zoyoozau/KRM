@@ -687,7 +687,8 @@ export default function Dashboard(){
               const totalInt=assessTableBase.filter(isInt).length;
               return(
                 <div className="space-y-4">
-                  {/* TOP ROW — histogram left, breakdown table right */}
+                  <div key={fadeKey} className="krm-fade space-y-4">
+                  {/* TOP ROW — histogram left, breakdown table right — fade on filter change */}
                   <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(320px,1.4fr)] xl:grid-cols-[minmax(0,3fr)_minmax(360px,1.4fr)] gap-4 items-stretch">
                     {/* Left: histogram — same height as right card */}
                     <div className="bg-white rounded-xl shadow p-6 flex flex-col">
@@ -862,6 +863,7 @@ export default function Dashboard(){
                       </table>
                     </div>
                   </div>
+                  </div>{/* /krm-fade */}
                 </div>
               );
             })()}
