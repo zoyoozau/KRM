@@ -210,13 +210,15 @@ function progColor(p){
   return PROG_COLORS[k]||'#94A3B8';
 }
 
-// PROGRESS HISTOGRAM: bar chart grouped by progress %
-function ProgressHistogram({data}){
+// PROGRESS HISTOGRAM: bar chart grouped by progress % — clickable
+function ProgressHistogram({data,onBarClick,activeBar}){
+  const[hovBar,setHovBar]=useState(null);
   if(!data.length)return<p className="text-gray-400 text-sm py-8 text-center">ไม่มีข้อมูลความก้าวหน้า</p>;
   const max=Math.max(...data.map(d=>d.count),1);
   const H=160,BW=44,GAP=16,PL=42;
   const totalW=PL+data.length*(BW+GAP)+GAP;
   const yTicks=[0,10,20,30].filter(v=>v<=Math.ceil(max/10)*10);
+  const hasActive=activeBar!==null&&activeBar!==undefined;
   return(
     <div style={{maxWidth:totalW,width:'100%',margin:'0 auto'}}>
       <svg viewBox={`0 0 ${totalW} ${H+55}`} width="100%" style={{display:'block'}}>
@@ -235,14 +237,29 @@ function ProgressHistogram({data}){
           const x=PL+i*(BW+GAP)+GAP;
           const h=Math.max((d.count/max)*H,2);
           const col=progColor(d.value);
-          return(<g key={i}>
-            <rect x={x} y={H-h} width={BW} height={h} fill={col} rx="3"/>
-            <text x={x+BW/2} y={H-h-5} textAnchor="middle" fontSize="11" fill="#374151" fontWeight="700">{d.count}</text>
-            <text x={x+BW/2} y={H+14} textAnchor="middle" fontSize="10" fill="#6b7280">{d.value}</text>
-          </g>);
+          const isActive=activeBar===d.value;
+          const isHov=hovBar===i;
+          const dimmed=hasActive&&!isActive;
+          return(
+            <g key={i} style={{cursor:'pointer',transition:'opacity 0.2s'}}
+              onMouseEnter={()=>setHovBar(i)} onMouseLeave={()=>setHovBar(null)}
+              onClick={()=>onBarClick&&onBarClick(isActive?null:d.value)}
+              opacity={dimmed?0.3:1}>
+              {/* hover/active bg */}
+              {(isActive||isHov)&&<rect x={x-4} y={H-h-8} width={BW+8} height={h+8} fill={isActive?'#1B3A8C':col} rx="5" opacity="0.12"/>}
+              <rect x={x} y={H-h} width={BW} height={h} fill={col} rx="3"
+                stroke={isActive?'#1B3A8C':'none'} strokeWidth={isActive?2:0}
+                style={{filter:isHov&&!isActive?'brightness(1.15)':'none'}}/>
+              <text x={x+BW/2} y={H-h-5} textAnchor="middle" fontSize="11" fill={isActive?'#1B3A8C':'#374151'} fontWeight="700">{d.count}</text>
+              <text x={x+BW/2} y={H+14} textAnchor="middle" fontSize={isActive?11:10} fontWeight={isActive?'800':'normal'} fill={isActive?'#1B3A8C':'#6b7280'}>{d.value}</text>
+              {isActive&&<rect x={x} y={H+17} width={BW} height={2} fill="#1B3A8C" rx="1"/>}
+            </g>
+          );
         })}
         {/* X-axis label */}
         <text x={PL+data.length*(BW+GAP)/2} y={H+30} textAnchor="middle" fontSize="10" fill="#6b7280">ความก้าวหน้า (%)</text>
+        {/* hint */}
+        <text x={PL+data.length*(BW+GAP)/2} y={H+46} textAnchor="middle" fontSize="8" fill="#aaa">คลิกเพื่อกรองโครงการ</text>
         {/* Baseline */}
         <line x1={PL-4} y1={H} x2={totalW} y2={H} stroke="#9ca3af" strokeWidth="1.5"/>
       </svg>
@@ -288,6 +305,8 @@ export default function Dashboard(){
   const[mentorFilter,setMentorFilter]=useState('');
   const[expandedIdx,setExpandedIdx]=useState(null);
   const[assessFilter,setAssessFilter]=useState(''); // 'dev' | 'int' | ''
+  const[progressFilter,setProgressFilter]=useState(null); // number | null
+  const[expandedAssessIdx,setExpandedAssessIdx]=useState(null);
 
   useEffect(()=>{
     fetch(CSV_URL)
@@ -414,7 +433,7 @@ export default function Dashboard(){
         <div className="max-w-screen-2xl mx-auto px-3 flex items-center min-h-[40px] gap-1">
           <div className="hidden md:flex gap-1 py-1 shrink-0">
             {PAGES.map(p=>(
-              <button key={p.id} onClick={()=>{setPage(p.id);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setFadeKey(k=>k+1);}}
+              <button key={p.id} onClick={()=>{setPage(p.id);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setProgressFilter(null);setExpandedAssessIdx(null);setFadeKey(k=>k+1);}}
                 className={`px-3 py-1 rounded text-xs font-bold whitespace-nowrap transition-all ${page===p.id?'bg-white text-[#1B3A8C] shadow':'hover:bg-white/20'}`}>
                 {p.icon} {p.label}
               </button>
@@ -649,10 +668,13 @@ export default function Dashboard(){
 
             {/* ═══ ประเมินโครงการ ═══ */}
             {page==='assess'&&(()=>{
-              const progRows=filtered.filter(r=>getProgress(r)>0);
-              // Histogram: group by progress value
+              // ใช้ filtered ทั้งหมดสำหรับ histogram source (ไม่กรอง progress ซ้ำ)
+              const allProgRows=filtered.filter(r=>getProgress(r)>0);
+              // กรองเพิ่มถ้ามี progressFilter
+              const progRows=progressFilter!==null?allProgRows.filter(r=>getProgress(r)===progressFilter):allProgRows;
+              // Histogram: group by progress value จาก allProgRows (แสดงครบทุกค่าเสมอ)
               const grp={};
-              progRows.forEach(r=>{const p=getProgress(r);grp[p]=(grp[p]||0)+1;});
+              allProgRows.forEach(r=>{const p=getProgress(r);grp[p]=(grp[p]||0)+1;});
               const histData=Object.entries(grp).map(([v,c])=>({value:parseInt(v),count:c})).sort((a,b)=>a.value-b.value);
               // classify จาก column AX ของชีท (ไม่ใช้ % อีกต่อไป)
               const isDev=r=>{const a=getAssess(r);return a.includes('พัฒนา');};
@@ -669,8 +691,17 @@ export default function Dashboard(){
                   <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(320px,1.4fr)] xl:grid-cols-[minmax(0,3fr)_minmax(360px,1.4fr)] gap-4 items-start">
                     {/* Left: histogram — constrained + centered */}
                     <div className="bg-white rounded-xl shadow p-6">
-                      <h3 className="font-bold text-gray-800 mb-4 text-base">ประเมินความก้าวหน้าโครงการ</h3>
-                      <ProgressHistogram data={histData}/>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-gray-800 text-base">ประเมินความก้าวหน้าโครงการ</h3>
+                        {progressFilter!==null&&(
+                          <button onClick={()=>{setProgressFilter(null);setExpandedAssessIdx(null);}}
+                            className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-[#1B3A8C]/10 text-[#1B3A8C] hover:bg-red-50 hover:text-red-500 transition-colors whitespace-nowrap">
+                            ✕ {progressFilter}%
+                          </button>
+                        )}
+                      </div>
+                      <ProgressHistogram data={histData} activeBar={progressFilter}
+                        onBarClick={v=>{setProgressFilter(v);setExpandedAssessIdx(null);setFadeKey(k=>k+1);}}/>
                     </div>
                     {/* Right: region breakdown table — คลิกเพื่อ filter */}
                     <div className="bg-white rounded-xl shadow p-6">
@@ -775,15 +806,24 @@ export default function Dashboard(){
                           </tr>
                         </thead>
                         <tbody>
-                          {progRows.map((r,i)=>{
+                          {progRows.flatMap((r,i)=>{
                             const prog=getProgress(r);
                             const col=progColor(prog);
                             const assess=getAssess(r);
                             const assessCol=assess.includes('พัฒนา')?'#F97316':assess.includes('น่าสนใจ')||assess.includes('เป็นโครงการ')?'#16A34A':'#9CA3AF';
-                            return(
-                              <tr key={i} className={`border-b border-gray-100 ${i%2===0?'bg-white':'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
+                            const isExp=expandedAssessIdx===i;
+                            return[
+                              <tr key={`r${i}`}
+                                onClick={()=>setExpandedAssessIdx(isExp?null:i)}
+                                className={`border-b border-gray-100 cursor-pointer transition-colors
+                                  ${isExp?'bg-blue-50 border-b-0':i%2===0?'bg-white':'bg-gray-50'} hover:bg-blue-50`}>
                                 <td className="px-3 py-2 text-gray-400">{getRowNo(r)||i+1}</td>
-                                <td className="px-3 py-2 text-gray-800 text-sm">{getProject(r)}</td>
+                                <td className="px-3 py-2 text-gray-800 text-sm">
+                                  <div className="flex items-start gap-1.5">
+                                    <span className={`mt-0.5 text-xs shrink-0 transition-transform ${isExp?'rotate-90':''} text-gray-300`}>▶</span>
+                                    <span>{getProject(r)}</span>
+                                  </div>
+                                </td>
                                 <td className="px-3 py-2"><Badge text={getRegion(r)} color={REGION_COLORS[getRegion(r)]??'#94A3B8'}/></td>
                                 <td className="px-3 py-2">
                                   <div className="flex items-center gap-2">
@@ -795,10 +835,27 @@ export default function Dashboard(){
                                 </td>
                                 <td className="px-3 py-2 text-xs font-semibold whitespace-nowrap" style={{color:assessCol}}>{assess||<span className="text-gray-300">-</span>}</td>
                                 <td className="px-3 py-2 text-gray-600 text-xs font-semibold">{getMentorNick(r)}</td>
-                              </tr>
-                            );
+                              </tr>,
+                              isExp&&(
+                                <tr key={`e${i}`} className="bg-blue-50 border-b border-blue-100">
+                                  <td className="px-3 py-2 text-gray-300 text-xs text-right align-top">└</td>
+                                  <td colSpan="5" className="px-3 pb-3 pt-1">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5 text-xs text-gray-700">
+                                      <div><span className="text-gray-400">📍 จังหวัด </span><span className="font-medium">{getProvince(r)||'-'}</span></div>
+                                      <div><span className="text-gray-400">🗺️ ภาค </span><span className="font-medium" style={{color:REGION_COLORS[getRegion(r)]??'#555'}}>{getRegion(r)||'-'}</span></div>
+                                      <div><span className="text-gray-400">👤 พี่เลี้ยง </span><span className="font-semibold text-[#1B3A8C]">{getMentorNick(r)||'-'}</span></div>
+                                      <div><span className="text-gray-400">💰 งบประมาณ </span><span className="font-medium">{getBudget(r)?`฿${getBudget(r).toLocaleString()}`:'-'}</span></div>
+                                      {getIssue(r)&&<div className="col-span-2"><span className="text-gray-400">🏷️ ประเด็น </span>{getIssue(r)}</div>}
+                                      {getStatus(r)&&<div><span className="text-gray-400">📋 สถานะ </span>{getStatus(r)}</div>}
+                                      {getLeaders(r)>0&&<div><span className="text-gray-400">👥 แกนนำ </span><span className="font-semibold text-[#F97316]">{getLeaders(r)} คน</span></div>}
+                                      {getTargetP(r)>0&&<div><span className="text-gray-400">🎯 กลุ่มเป้าหมาย </span><span className="font-semibold text-[#1D4ED8]">{getTargetP(r)} คน</span></div>}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )
+                            ].filter(Boolean);
                           })}
-                          {progRows.length===0&&<tr><td colSpan="5" className="text-center py-10 text-gray-400">ไม่มีข้อมูลความก้าวหน้า</td></tr>}
+                          {progRows.length===0&&<tr><td colSpan="6" className="text-center py-10 text-gray-400">ไม่มีข้อมูลความก้าวหน้า</td></tr>}
                         </tbody>
                       </table>
                     </div>
