@@ -6,6 +6,9 @@ const SHEET_ID  = '1uFaWzUV8J8HxCDk6rSiUlqAmhiyt9JT3b1yeonWQNK0';
 const SHEET_GID = '1566885801';
 const CSV_URL   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
 
+const NETWORK_SHEET_ID = '15r70qNz1JArSDSpkMoB5GhWdZL0DZiMCs5VtaR5syCU';
+const NETWORK_CSV_URL  = `https://docs.google.com/spreadsheets/d/${NETWORK_SHEET_ID}/export?format=csv`;
+
 const REGION_COLORS = {
   'ภาคเหนือ':      '#EF4444',
   'ใต้':           '#3B82F6',
@@ -267,6 +270,303 @@ function ProgressHistogram({data,onBarClick,activeBar}){
   );
 }
 
+// ═══════════════════════════════════════════════════
+// NETWORK PAGE — ภาคีคนรุ่นใหม่ island visualization
+// ═══════════════════════════════════════════════════
+const ISLAND_CFG=[
+  {key:'หมวดสุขภาพ',             label:'สุขภาพ',     icon:'🏥', color:'#F472B6',dark:'#BE185D',bg:'#FDF2F8',
+   xPct:'12%',yPct:'10%',delay:0,   floatK:'islFloatA',br:'55% 45% 60% 40%/50% 60% 40% 50%'},
+  {key:'หมวดเศรษฐกิจ',           label:'เศรษฐกิจ',   icon:'💼', color:'#FBBF24',dark:'#B45309',bg:'#FFFBEB',
+   xPct:'57%',yPct:'6%', delay:0.8, floatK:'islFloatB',br:'45% 55% 40% 60%/60% 40% 55% 45%'},
+  {key:'หมวดสังคม',              label:'สังคม',      icon:'🤝', color:'#60A5FA',dark:'#1D4ED8',bg:'#EFF6FF',
+   xPct:'80%',yPct:'48%',delay:1.5, floatK:'islFloatA',br:'60% 40% 55% 45%/45% 55% 40% 60%'},
+  {key:'หมวดวิชาการ/การศึกษา',   label:'วิชาการ',    icon:'📚', color:'#A78BFA',dark:'#6D28D9',bg:'#F5F3FF',
+   xPct:'30%',yPct:'60%',delay:0.4, floatK:'islFloatB',br:'50% 50% 45% 55%/55% 45% 60% 40%'},
+  {key:'หมวดสื่อ',               label:'สื่อ',       icon:'📱', color:'#34D399',dark:'#065F46',bg:'#ECFDF5',
+   xPct:'65%',yPct:'68%',delay:1.2, floatK:'islFloatA',br:'45% 55% 50% 50%/40% 60% 45% 55%'},
+];
+
+function parseNetCSV(text){
+  function tok(src){
+    const rows=[];let row=[],cur='',inQ=false,i=0;
+    while(i<src.length){
+      const ch=src[i];
+      if(ch==='"'){if(inQ&&src[i+1]==='"'){cur+='"';i+=2;continue;}inQ=!inQ;i++;continue;}
+      if(ch===','&&!inQ){row.push(cur);cur='';i++;continue;}
+      if((ch==='\n'||ch==='\r')&&!inQ){if(ch==='\r'&&src[i+1]==='\n')i++;row.push(cur);rows.push(row);row=[];cur='';i++;continue;}
+      cur+=ch;i++;
+    }
+    if(cur||row.length){row.push(cur);rows.push(row);}
+    return rows;
+  }
+  const rows=tok(text);
+  if(rows.length<2)return[];
+  const hdrs=rows[0].map(h=>h.replace(/^\uFEFF/,'').trim());
+  return rows.slice(1).filter(v=>(v[0]||'').trim()).map(v=>{
+    const o={};hdrs.forEach((h,i)=>{if(h)o[h]=(v[i]||'').trim();});return o;
+  });
+}
+
+function NetworkPage(){
+  const[netRows,setNetRows]=useState([]);
+  const[netLoad,setNetLoad]=useState(true);
+  const[netErr,setNetErr]=useState('');
+  const[selIsland,setSelIsland]=useState(null);
+  const[netSearch,setNetSearch]=useState('');
+
+  useEffect(()=>{
+    fetch(NETWORK_CSV_URL)
+      .then(r=>{if(!r.ok)throw new Error('fetch error');return r.text();})
+      .then(t=>{const d=parseNetCSV(t);setNetRows(d);})
+      .catch(()=>setNetErr('โหลดข้อมูลไม่ได้ กรุณาแชร์ Sheet เป็น "ทุกคนที่มีลิ้งค์"'))
+      .finally(()=>setNetLoad(false));
+  },[]);
+
+  const countOf=key=>netRows.filter(r=>(r['หมวดหมู่']||'')===key).length;
+
+  const filteredOrgs=useMemo(()=>{
+    if(!selIsland)return[];
+    return netRows.filter(r=>{
+      if((r['หมวดหมู่']||'')!==selIsland)return false;
+      if(netSearch){
+        const s=netSearch.toLowerCase();
+        return(r['องค์กร']||'').toLowerCase().includes(s)||
+               (r['ภายใต้การสนับสนุน/ประเด็นเคลื่อน']||'').toLowerCase().includes(s);
+      }
+      return true;
+    });
+  },[netRows,selIsland,netSearch]);
+
+  const selCfg=ISLAND_CFG.find(i=>i.key===selIsland);
+
+  return(
+    <div className="space-y-4">
+      {/* Title bar */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="text-xl font-extrabold text-[#1B3A8C]">🤝 ภาคีคนรุ่นใหม่</h2>
+        <div className="flex items-center gap-2">
+          {netLoad&&<span className="text-xs text-gray-400 animate-pulse">⏳ กำลังโหลด...</span>}
+          {!netLoad&&!netErr&&<span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full font-semibold">{netRows.length} องค์กร</span>}
+        </div>
+      </div>
+
+      {netErr&&<div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-700 text-sm">⚠️ {netErr}</div>}
+
+      {/* ── ISLAND MAP ── */}
+      <div style={{
+        position:'relative',width:'100%',paddingBottom:'52%',
+        background:'linear-gradient(175deg,#0EA5E9 0%,#0369A1 55%,#075985 100%)',
+        borderRadius:20,overflow:'hidden',
+        boxShadow:'0 12px 40px rgba(14,165,233,0.35)',
+        minHeight:260,
+      }}>
+
+        {/* ── animated waves ── */}
+        <div style={{position:'absolute',bottom:0,left:0,width:'200%',pointerEvents:'none',
+          animation:'waveAnim 8s linear infinite',opacity:0.18}}>
+          <svg viewBox="0 0 2880 80" preserveAspectRatio="none" height={50} width="100%">
+            <path d="M0,40 C240,70 480,10 720,40 C960,70 1200,10 1440,40 C1680,70 1920,10 2160,40 C2400,70 2640,10 2880,40 L2880,80 L0,80Z" fill="white"/>
+          </svg>
+        </div>
+        <div style={{position:'absolute',bottom:0,left:0,width:'200%',pointerEvents:'none',
+          animation:'waveAnim 12s linear infinite',animationDirection:'reverse',opacity:0.1}}>
+          <svg viewBox="0 0 2880 60" preserveAspectRatio="none" height={35} width="100%">
+            <path d="M0,30 C360,50 720,10 1080,30 C1440,50 1800,10 2160,30 C2520,50 2880,10 2880,30 L2880,60 L0,60Z" fill="white"/>
+          </svg>
+        </div>
+
+        {/* ── clouds ── */}
+        {[
+          {top:'4%',left:'30%',sz:26,d:0},
+          {top:'14%',right:'18%',sz:20,d:2},
+          {top:'6%',left:'68%',sz:16,d:1},
+          {top:'2%',left:'48%',sz:18,d:3},
+        ].map((c,i)=>(
+          <div key={i} style={{
+            position:'absolute',top:c.top,left:c.left,right:c.right,
+            opacity:0.6,pointerEvents:'none',
+            animation:`islFloatB ${6+i}s ease-in-out infinite`,
+            animationDelay:`${c.d}s`,
+          }}>
+            <span style={{fontSize:c.sz}}>☁️</span>
+          </div>
+        ))}
+
+        {/* ── sparkle decorations ── */}
+        {[
+          {top:'25%',left:'42%',sz:12},{top:'40%',left:'20%',sz:10},{top:'55%',left:'50%',sz:10},
+        ].map((s,i)=>(
+          <div key={i} style={{position:'absolute',top:s.top,left:s.left,opacity:0.4,pointerEvents:'none'}}>
+            <span style={{fontSize:s.sz}}>✨</span>
+          </div>
+        ))}
+
+        {/* ── ISLANDS ── */}
+        {ISLAND_CFG.map((isl,idx)=>{
+          const cnt=countOf(isl.key);
+          const isSel=selIsland===isl.key;
+          return(
+            <div key={isl.key}
+              onClick={()=>{setSelIsland(p=>p===isl.key?null:isl.key);setNetSearch('');}}
+              style={{
+                position:'absolute',left:isl.xPct,top:isl.yPct,
+                width:'min(148px,19%)',height:'min(120px,15%)',
+                cursor:'pointer',
+                animation:`${isl.floatK} ${4.2+idx*0.35}s ease-in-out infinite`,
+                animationDelay:`${isl.delay}s`,
+                transform:'translateX(-50%)',
+                zIndex:isSel?20:10,
+                filter:isSel
+                  ?`drop-shadow(0 0 14px ${isl.color}) drop-shadow(0 6px 16px rgba(0,0,0,0.3))`
+                  :'drop-shadow(0 4px 14px rgba(0,0,0,0.28))',
+                transition:'filter 0.25s',
+              }}>
+              <div style={{
+                width:'100%',height:'100%',
+                background:`linear-gradient(145deg,${isl.color}DD,${isl.color})`,
+                borderRadius:isl.br,
+                border:`2.5px solid ${isSel?'white':isl.color+'AA'}`,
+                display:'flex',flexDirection:'column',
+                alignItems:'center',justifyContent:'center',gap:3,
+                boxShadow:`0 6px 20px ${isl.color}55,inset 0 2px 8px rgba(255,255,255,0.35)`,
+                position:'relative',overflow:'hidden',
+              }}>
+                {/* texture dots */}
+                <div style={{position:'absolute',top:5,left:7,width:7,height:7,borderRadius:'50%',background:'rgba(255,255,255,0.3)',pointerEvents:'none'}}/>
+                <div style={{position:'absolute',top:11,right:9,width:5,height:5,borderRadius:'50%',background:'rgba(255,255,255,0.2)',pointerEvents:'none'}}/>
+                <div style={{position:'absolute',bottom:9,left:11,width:6,height:6,borderRadius:'50%',background:'rgba(255,255,255,0.25)',pointerEvents:'none'}}/>
+                {isSel&&<div style={{position:'absolute',inset:0,background:'rgba(255,255,255,0.18)',borderRadius:'inherit',pointerEvents:'none'}}/>}
+
+                <span style={{fontSize:'clamp(20px,3vw,30px)',lineHeight:1,filter:'drop-shadow(0 2px 3px rgba(0,0,0,0.2))'}}>{isl.icon}</span>
+                <span style={{fontSize:'clamp(10px,1.4vw,13px)',fontWeight:800,color:'white',
+                  textShadow:'0 1px 4px rgba(0,0,0,0.5)',textAlign:'center',lineHeight:1.2,paddingInline:6}}>
+                  {isl.label}
+                </span>
+                {!netLoad&&<span style={{
+                  fontSize:'clamp(9px,1.2vw,11px)',fontWeight:700,
+                  background:'rgba(0,0,0,0.28)',color:'white',
+                  borderRadius:999,paddingInline:7,paddingBlock:1,
+                  backdropFilter:'blur(4px)',
+                }}>
+                  {cnt} องค์กร
+                </span>}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* tap hint */}
+        {!selIsland&&!netLoad&&!netErr&&(
+          <div style={{
+            position:'absolute',bottom:'8%',left:'50%',transform:'translateX(-50%)',
+            background:'rgba(0,0,0,0.38)',backdropFilter:'blur(6px)',
+            color:'white',fontSize:12,fontWeight:600,
+            borderRadius:999,paddingInline:14,paddingBlock:5,
+            whiteSpace:'nowrap',pointerEvents:'none',
+            animation:'islFloatB 3s ease-in-out infinite',
+          }}>
+            👆 แตะเกาะเพื่อดูองค์กร
+          </div>
+        )}
+      </div>
+
+      {/* ── ORG PANEL ── */}
+      {selIsland&&selCfg&&(
+        <div className="isl-panel" style={{
+          background:selCfg.bg,
+          border:`2px solid ${selCfg.color}55`,
+          borderRadius:16,padding:16,
+        }}>
+          {/* panel header */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <span style={{
+                fontSize:36,filter:`drop-shadow(0 2px 6px ${selCfg.color}88)`,
+                animation:'islFloatB 3s ease-in-out infinite',
+                display:'inline-block',
+              }}>{selCfg.icon}</span>
+              <div>
+                <h3 style={{margin:0,fontSize:16,fontWeight:800,color:selCfg.dark}}>{selCfg.key}</h3>
+                <span style={{fontSize:12,color:'#6B7280'}}>{filteredOrgs.length} องค์กร</span>
+              </div>
+            </div>
+            <button onClick={()=>setSelIsland(null)}
+              style={{width:30,height:30,borderRadius:'50%',border:'none',
+                background:`${selCfg.color}33`,cursor:'pointer',
+                fontSize:14,fontWeight:700,color:selCfg.dark,
+                display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,
+              }}>✕</button>
+          </div>
+
+          {/* search */}
+          <input
+            value={netSearch}
+            onChange={e=>setNetSearch(e.target.value)}
+            placeholder={`🔍 ค้นหาในหมวด${selCfg.label}...`}
+            style={{
+              width:'100%',padding:'8px 12px',borderRadius:10,
+              border:`1.5px solid ${selCfg.color}77`,
+              background:'white',fontSize:13,outline:'none',
+              marginBottom:12,boxSizing:'border-box',
+              fontFamily:'inherit',
+            }}
+          />
+
+          {/* cards grid */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:10}}>
+            {filteredOrgs.length===0&&(
+              <div style={{textAlign:'center',color:'#9CA3AF',padding:'20px 0',gridColumn:'1/-1',fontSize:13}}>
+                ไม่พบองค์กรที่ค้นหา
+              </div>
+            )}
+            {filteredOrgs.map((org,i)=>(
+              <div key={i} style={{
+                background:'white',borderRadius:12,padding:'12px 14px',
+                border:`1px solid ${selCfg.color}33`,
+                boxShadow:`0 2px 10px ${selCfg.color}1A`,
+                display:'flex',flexDirection:'column',gap:6,
+              }}>
+                <div style={{fontWeight:700,fontSize:14,color:'#111827',lineHeight:1.3}}>
+                  {org['องค์กร']||'—'}
+                </div>
+                {org['ภายใต้การสนับสนุน/ประเด็นเคลื่อน']&&(
+                  <div style={{
+                    fontSize:11,color:selCfg.dark,
+                    background:selCfg.bg,border:`1px solid ${selCfg.color}44`,
+                    borderRadius:6,padding:'3px 8px',
+                    display:'inline-block',alignSelf:'flex-start',lineHeight:1.4,
+                  }}>
+                    {org['ภายใต้การสนับสนุน/ประเด็นเคลื่อน']}
+                  </div>
+                )}
+                {(org['page facebook']||org['page facebook2'])&&(
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:2}}>
+                    {[org['page facebook'],org['page facebook2']].filter(Boolean).map((fb,fi)=>(
+                      <a key={fi}
+                        href={fb.startsWith('http')?fb:`https://www.facebook.com/${fb}`}
+                        target="_blank" rel="noopener noreferrer"
+                        style={{
+                          display:'inline-flex',alignItems:'center',gap:4,
+                          fontSize:11,fontWeight:600,
+                          background:'#1877F2',color:'white',
+                          borderRadius:6,padding:'4px 10px',
+                          textDecoration:'none',
+                        }}>
+                        <span style={{fontWeight:900,fontSize:13}}>f</span>
+                        {fi===0?'Facebook':'Page 2'}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // LEAFLET MAP — โหลด Leaflet จาก CDN ใน useEffect
 function LeafletMap({pins,activeRegion}){
   const containerRef=useRef(null);
@@ -376,7 +676,7 @@ const PAGES=[
   {id:'overview', label:'ภาพรวม',       icon:'📊'},
   {id:'assess',   label:'ประเมินโครงการ',icon:'📈'},
   {id:'mapping',  label:'mapping',       icon:'🗺️'},
-  {id:'network',  label:'ภาคีคนรุ่นใหม่',icon:'🤝', soon:true},
+  {id:'network',  label:'ภาคีคนรุ่นใหม่',icon:'🤝'},
   {id:'quality',  label:'สรุปเชิงคุณภาพ',icon:'📝', soon:true},
 ];
 const MENTOR_PER_PAGE=10;
@@ -503,6 +803,11 @@ export default function Dashboard(){
         @keyframes krmFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         @keyframes krmFadeIn2{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         .krm-fade{animation-duration:0.45s;animation-timing-function:cubic-bezier(.22,.68,0,1.2);animation-fill-mode:both}
+        @keyframes islFloatA{0%,100%{transform:translateX(-50%) translateY(0px)}50%{transform:translateX(-50%) translateY(-14px)}}
+        @keyframes islFloatB{0%,100%{transform:translateX(-50%) translateY(-7px)}50%{transform:translateX(-50%) translateY(7px)}}
+        @keyframes waveAnim{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+        @keyframes cloudDrift{0%{transform:translateX(0)}100%{transform:translateX(30px)}}
+        .isl-panel{animation:krmFadeIn 0.4s cubic-bezier(.22,.68,0,1.2) both}
       `}</style>
 
       {/* HEADER — always visible at top */}
@@ -1039,13 +1344,14 @@ export default function Dashboard(){
               );
             })()}
 
+            {/* ═══ NETWORK PAGE ═══ */}
+            {page==='network'&&<NetworkPage/>}
+
             {/* ═══ COMING SOON PAGES ═══ */}
-            {(page==='network'||page==='quality')&&(
+            {page==='quality'&&(
               <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div className="text-6xl mb-4">{page==='network'?'🤝':'📝'}</div>
-                <h2 className="text-2xl font-extrabold text-[#1B3A8C] mb-2">
-                  {page==='network'?'ภาคีคนรุ่นใหม่':'สรุปข้อมูลเชิงคุณภาพ'}
-                </h2>
+                <div className="text-6xl mb-4">📝</div>
+                <h2 className="text-2xl font-extrabold text-[#1B3A8C] mb-2">สรุปข้อมูลเชิงคุณภาพ</h2>
                 <p className="text-gray-400 text-sm max-w-xs">หน้านี้อยู่ระหว่างการพัฒนา จะเปิดให้ใช้งานเร็วๆ นี้</p>
                 <div className="mt-6 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 text-amber-600 text-xs font-semibold">
                   <span>⏳</span> Coming Soon
