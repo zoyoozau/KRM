@@ -288,6 +288,7 @@ export default function Dashboard(){
   const[mentorPage,setMentorPage]=useState(0);
   const[mentorFilter,setMentorFilter]=useState('');
   const[expandedIdx,setExpandedIdx]=useState(null);
+  const[assessFilter,setAssessFilter]=useState(''); // 'dev' | 'int' | ''
 
   useEffect(()=>{
     fetch(CSV_URL)
@@ -308,8 +309,14 @@ export default function Dashboard(){
     return true;
   }),[rows,region,province,issue,search]);
 
-  // filtered: กรองรวม mentorFilter ด้วย — ใช้ KPI, charts, project table
-  const filtered=useMemo(()=>mentorFilter?filteredBase.filter(r=>getMentor(r)===mentorFilter):filteredBase,[filteredBase,mentorFilter]);
+  // filtered: กรองรวม mentorFilter + assessFilter — ใช้ KPI, charts, project table
+  const filtered=useMemo(()=>{
+    let f=filteredBase;
+    if(mentorFilter)f=f.filter(r=>getMentor(r)===mentorFilter);
+    if(assessFilter==='dev')f=f.filter(r=>getAssess(r).includes('พัฒนา'));
+    if(assessFilter==='int')f=f.filter(r=>getAssess(r).includes('น่าสนใจ')||getAssess(r).includes('เป็นโครงการ'));
+    return f;
+  },[filteredBase,mentorFilter,assessFilter]);
 
   const totalLeaders=filtered.reduce((s,r)=>s+getLeaders(r),0);
   const totalTargetP=filtered.reduce((s,r)=>s+getTargetP(r),0);
@@ -362,8 +369,15 @@ export default function Dashboard(){
   const mentorFrom=mentorRows.length>0?safeMP*MENTOR_PER_PAGE+1:0;
   const mentorTo=Math.min((safeMP+1)*MENTOR_PER_PAGE,mentorRows.length);
 
-  const changeRegion=val=>{setFadeKey(k=>k+1);setRegion(val);setProvince('ทั้งหมด');setMentorFilter('');setMentorPage(0);setExpandedIdx(null);};
-  const changeMentor=name=>{setFadeKey(k=>k+1);setMentorFilter(prev=>prev===name?'':name);setMentorPage(0);setExpandedIdx(null);};
+  const changeRegion=val=>{setFadeKey(k=>k+1);setRegion(val);setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setMentorPage(0);setExpandedIdx(null);};
+  const changeMentor=name=>{setFadeKey(k=>k+1);setMentorFilter(prev=>prev===name?'':name);setAssessFilter('');setMentorPage(0);setExpandedIdx(null);};
+  // คลิก cell ในตาราง assess: filter ภาค + ประเภท พร้อมกัน
+  const changeAssess=(reg,type)=>{
+    setFadeKey(k=>k+1);
+    if(region===reg&&assessFilter===type){setRegion('ทั้งหมด');setAssessFilter('');}
+    else{setRegion(reg);setAssessFilter(type);}
+    setProvince('ทั้งหมด');setMentorFilter('');setMentorPage(0);setExpandedIdx(null);
+  };
 
   return(
     <div className="min-h-screen flex flex-col bg-white">
@@ -657,14 +671,18 @@ export default function Dashboard(){
                     <div className="bg-white rounded-xl shadow p-6">
                       <div className="flex items-start justify-between mb-1">
                         <h3 className="font-bold text-gray-800 text-base leading-snug">โครงการที่น่าสนใจ/ทำสื่อ/ถอดบทเรียน</h3>
-                        {region!=='ทั้งหมด'&&(
-                          <button onClick={()=>changeRegion('ทั้งหมด')}
+                        {(region!=='ทั้งหมด'||assessFilter)&&(
+                          <button onClick={()=>{setFadeKey(k=>k+1);setRegion('ทั้งหมด');setAssessFilter('');}}
                             className="ml-2 shrink-0 flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-[#1B3A8C]/10 text-[#1B3A8C] hover:bg-red-50 hover:text-red-500 transition-colors whitespace-nowrap">
-                            ✕ {region}
+                            ✕ {region!=='ทั้งหมด'?region:''}{assessFilter==='dev'?' · พัฒนาอีกนิด':assessFilter==='int'?' · น่าสนใจ ทำสื่อ':''}
                           </button>
                         )}
                       </div>
-                      <p className="text-xs text-gray-400 mb-4">{region==='ทั้งหมด'?'คลิกแถวเพื่อกรองข้อมูล':'กำลังแสดงเฉพาะ '+region}</p>
+                      <p className="text-xs text-gray-400 mb-4">
+                        {!assessFilter&&region==='ทั้งหมด'?'คลิกช่องเพื่อกรองข้อมูล':
+                         assessFilter==='dev'?`แสดงเฉพาะ "พัฒนาอีกนิด"${region!=='ทั้งหมด'?' · '+region:''}`:
+                         `แสดงเฉพาะ "น่าสนใจ ทำสื่อ"${region!=='ทั้งหมด'?' · '+region:''}`}
+                      </p>
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b-2 border-gray-200">
@@ -679,27 +697,38 @@ export default function Dashboard(){
                             const dev=rs.filter(isDev).length;
                             const intr=rs.filter(isInt).length;
                             if(!dev&&!intr)return null;
-                            const isActive=region===reg;
                             const regColor=REGION_COLORS[reg]??'#555';
+                            const isDevActive=region===reg&&assessFilter==='dev';
+                            const isIntActive=region===reg&&assessFilter==='int';
+                            const isRowActive=region===reg&&!assessFilter;
                             return(
-                              <tr key={reg}
-                                onClick={()=>changeRegion(isActive?'ทั้งหมด':reg)}
-                                className={`border-b border-gray-100 cursor-pointer transition-all duration-150
-                                  ${isActive?'bg-gray-50':'hover:bg-gray-50'}`}
-                                style={isActive?{borderLeft:`3px solid ${regColor}`,paddingLeft:2}:{}}>
-                                <td className="py-2.5 pr-4 font-semibold whitespace-nowrap">
+                              <tr key={reg} className={`border-b border-gray-100 transition-all duration-150 ${isRowActive||isDevActive||isIntActive?'bg-gray-50':''}`}
+                                style={(isDevActive||isIntActive||isRowActive)?{borderLeft:`3px solid ${regColor}`}:{}}>
+                                {/* ชื่อภาค — คลิก filter แค่ภาค */}
+                                <td className="py-2.5 pr-3 cursor-pointer select-none"
+                                  onClick={()=>changeRegion(isRowActive?'ทั้งหมด':reg)}>
                                   <div className="flex items-center gap-1.5">
-                                    {isActive&&<span className="w-2 h-2 rounded-full shrink-0" style={{background:regColor}}/>}
-                                    <span style={{color:isActive?regColor:'#374151'}}>{reg}</span>
+                                    {(isDevActive||isIntActive||isRowActive)&&<span className="w-2 h-2 rounded-full shrink-0" style={{background:regColor}}/>}
+                                    <span className="font-semibold whitespace-nowrap hover:underline" style={{color:regColor}}>{reg}</span>
                                   </div>
                                 </td>
-                                <td className={`py-2.5 pl-2 font-bold w-10 text-right ${isActive?'text-gray-900':'text-gray-700'}`}>{dev||''}</td>
-                                <td className="py-2.5 pr-3">
-                                  {dev>0&&<div className="h-3.5 rounded transition-all" style={{width:`${Math.round((dev/maxBar)*100)}px`,background:isActive?regColor:'#22D3EE',minWidth:4}}/>}
+                                {/* พัฒนาอีกนิด cell — คลิก filter ภาค+dev */}
+                                <td colSpan="2" className="py-2 pr-3">
+                                  <div onClick={()=>dev>0&&changeAssess(reg,'dev')}
+                                    className={`flex items-center gap-2 rounded-lg px-2 py-1 transition-all duration-150
+                                      ${isDevActive?'bg-orange-100 ring-1 ring-orange-300':dev>0?'cursor-pointer hover:bg-orange-50':''}`}>
+                                    <span className={`font-bold w-6 text-right text-sm ${isDevActive?'text-orange-600':dev>0?'text-gray-800':'text-gray-300'}`}>{dev||0}</span>
+                                    {dev>0&&<div className="h-3.5 rounded transition-all" style={{width:`${Math.round((dev/maxBar)*96)}px`,background:isDevActive?'#F97316':'#22D3EE',minWidth:4}}/>}
+                                  </div>
                                 </td>
-                                <td className={`py-2.5 pl-2 font-bold w-10 text-right ${isActive?'text-gray-900':'text-gray-700'}`}>{intr||''}</td>
-                                <td className="py-2.5 pr-2">
-                                  {intr>0&&<div className="h-3.5 rounded transition-all" style={{width:`${Math.round((intr/maxBar)*100)}px`,background:isActive?regColor:'#22D3EE',minWidth:4}}/>}
+                                {/* น่าสนใจ ทำสื่อ cell — คลิก filter ภาค+int */}
+                                <td colSpan="2" className="py-2 pr-2">
+                                  <div onClick={()=>intr>0&&changeAssess(reg,'int')}
+                                    className={`flex items-center gap-2 rounded-lg px-2 py-1 transition-all duration-150
+                                      ${isIntActive?'bg-green-100 ring-1 ring-green-300':intr>0?'cursor-pointer hover:bg-green-50':''}`}>
+                                    <span className={`font-bold w-6 text-right text-sm ${isIntActive?'text-green-700':intr>0?'text-gray-800':'text-gray-300'}`}>{intr||0}</span>
+                                    {intr>0&&<div className="h-3.5 rounded transition-all" style={{width:`${Math.round((intr/maxBar)*96)}px`,background:isIntActive?'#16A34A':'#22D3EE',minWidth:4}}/>}
+                                  </div>
                                 </td>
                               </tr>
                             );
