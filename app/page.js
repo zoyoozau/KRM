@@ -688,9 +688,9 @@ export default function Dashboard(){
               return(
                 <div className="space-y-4">
                   {/* TOP ROW — histogram left, breakdown table right */}
-                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(320px,1.4fr)] xl:grid-cols-[minmax(0,3fr)_minmax(360px,1.4fr)] gap-4 items-start">
-                    {/* Left: histogram — constrained + centered */}
-                    <div className="bg-white rounded-xl shadow p-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(320px,1.4fr)] xl:grid-cols-[minmax(0,3fr)_minmax(360px,1.4fr)] gap-4 items-stretch">
+                    {/* Left: histogram — same height as right card */}
+                    <div className="bg-white rounded-xl shadow p-6 flex flex-col">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-bold text-gray-800 text-base">ประเมินความก้าวหน้าโครงการ</h3>
                         {progressFilter!==null&&(
@@ -700,8 +700,10 @@ export default function Dashboard(){
                           </button>
                         )}
                       </div>
+                      <div className="flex-1 flex items-center">
                       <ProgressHistogram data={histData} activeBar={progressFilter}
                         onBarClick={v=>{setProgressFilter(v);setExpandedAssessIdx(null);setFadeKey(k=>k+1);}}/>
+                      </div>
                     </div>
                     {/* Right: region breakdown table — คลิกเพื่อ filter */}
                     <div className="bg-white rounded-xl shadow p-6">
