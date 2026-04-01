@@ -407,7 +407,7 @@ export default function Dashboard(){
         <div className="max-w-screen-2xl mx-auto px-3 flex items-center min-h-[40px] gap-1">
           <div className="hidden md:flex gap-1 py-1 shrink-0">
             {PAGES.map(p=>(
-              <button key={p.id} onClick={()=>setPage(p.id)}
+              <button key={p.id} onClick={()=>{setPage(p.id);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setFadeKey(k=>k+1);}}
                 className={`px-3 py-1 rounded text-xs font-bold whitespace-nowrap transition-all ${page===p.id?'bg-white text-[#1B3A8C] shadow':'hover:bg-white/20'}`}>
                 {p.icon} {p.label}
               </button>
@@ -432,7 +432,7 @@ export default function Dashboard(){
         {menuOpen&&(
           <div className="md:hidden px-3 pb-2 flex flex-col gap-1 border-t border-white/20">
             {PAGES.map(p=>(
-              <button key={p.id} onClick={()=>{setPage(p.id);setMenuOpen(false);}}
+              <button key={p.id} onClick={()=>{setPage(p.id);setMenuOpen(false);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setFadeKey(k=>k+1);}}
                 className={`text-left px-3 py-2 rounded text-sm font-bold ${page===p.id?'bg-white text-[#1B3A8C]':'hover:bg-white/20'}`}>
                 {p.icon} {p.label}
               </button>
@@ -713,21 +713,21 @@ export default function Dashboard(){
                                   </div>
                                 </td>
                                 {/* พัฒนาอีกนิด cell — คลิก filter ภาค+dev */}
-                                <td colSpan="2" className="py-2 pr-3">
+                                <td colSpan="2" className="py-2 pr-2 min-w-0">
                                   <div onClick={()=>dev>0&&changeAssess(reg,'dev')}
-                                    className={`flex items-center gap-2 rounded-lg px-2 py-1 transition-all duration-150
+                                    className={`flex items-center gap-1.5 rounded-lg px-2 py-1 transition-all duration-150 overflow-hidden
                                       ${isDevActive?'bg-orange-100 ring-1 ring-orange-300':dev>0?'cursor-pointer hover:bg-orange-50':''}`}>
-                                    <span className={`font-bold w-6 text-right text-sm ${isDevActive?'text-orange-600':dev>0?'text-gray-800':'text-gray-300'}`}>{dev||0}</span>
-                                    {dev>0&&<div className="h-3.5 rounded transition-all" style={{width:`${Math.round((dev/maxBar)*96)}px`,background:isDevActive?'#F97316':'#22D3EE',minWidth:4}}/>}
+                                    <span className={`font-bold w-6 shrink-0 text-right text-sm ${isDevActive?'text-orange-600':dev>0?'text-gray-800':'text-gray-300'}`}>{dev||0}</span>
+                                    {dev>0&&<div className="h-3.5 rounded transition-all shrink-0" style={{width:`${Math.round((dev/maxBar)*60)}px`,background:isDevActive?'#F97316':'#22D3EE',minWidth:4}}/>}
                                   </div>
                                 </td>
                                 {/* น่าสนใจ ทำสื่อ cell — คลิก filter ภาค+int */}
-                                <td colSpan="2" className="py-2 pr-2">
+                                <td colSpan="2" className="py-2 pr-2 min-w-0">
                                   <div onClick={()=>intr>0&&changeAssess(reg,'int')}
-                                    className={`flex items-center gap-2 rounded-lg px-2 py-1 transition-all duration-150
+                                    className={`flex items-center gap-1.5 rounded-lg px-2 py-1 transition-all duration-150 overflow-hidden
                                       ${isIntActive?'bg-green-100 ring-1 ring-green-300':intr>0?'cursor-pointer hover:bg-green-50':''}`}>
-                                    <span className={`font-bold w-6 text-right text-sm ${isIntActive?'text-green-700':intr>0?'text-gray-800':'text-gray-300'}`}>{intr||0}</span>
-                                    {intr>0&&<div className="h-3.5 rounded transition-all" style={{width:`${Math.round((intr/maxBar)*96)}px`,background:isIntActive?'#16A34A':'#22D3EE',minWidth:4}}/>}
+                                    <span className={`font-bold w-6 shrink-0 text-right text-sm ${isIntActive?'text-green-700':intr>0?'text-gray-800':'text-gray-300'}`}>{intr||0}</span>
+                                    {intr>0&&<div className="h-3.5 rounded transition-all shrink-0" style={{width:`${Math.round((intr/maxBar)*60)}px`,background:isIntActive?'#16A34A':'#22D3EE',minWidth:4}}/>}
                                   </div>
                                 </td>
                               </tr>
