@@ -498,15 +498,15 @@ export default function Dashboard(){
   };
 
   return(
-    <div className="min-h-screen bg-white overflow-x-hidden">
+    <div className="h-screen flex flex-col bg-white" style={{overflow:'hidden'}}>
       <style>{`
         @keyframes krmFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         @keyframes krmFadeIn2{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         .krm-fade{animation-duration:0.45s;animation-timing-function:cubic-bezier(.22,.68,0,1.2);animation-fill-mode:both}
       `}</style>
 
-      {/* HEADER */}
-      <header style={{background:'linear-gradient(90deg,#BF8B00 0%,#FFD700 30%,#FFE44D 50%,#FFD700 70%,#BF8B00 100%)'}}>
+      {/* HEADER — always visible at top */}
+      <header style={{background:'linear-gradient(90deg,#BF8B00 0%,#FFD700 30%,#FFE44D 50%,#FFD700 70%,#BF8B00 100%)',flexShrink:0}}>
         <div className="max-w-screen-2xl mx-auto px-3 py-2 flex items-center gap-3">
           <div className="hidden lg:flex items-center gap-1.5 invisible pointer-events-none">
             {[1,2,3].map(n=><div key={n} style={{width:50,height:50}}/>)}
@@ -524,9 +524,9 @@ export default function Dashboard(){
         </div>
       </header>
 
-      {/* NAV — sticky top, ใช้ได้ทั้ง mobile + desktop */}
-      <nav className="bg-[#1B3A8C] text-white shadow-md sticky top-0 z-[1500]">
-        <div className="max-w-screen-2xl mx-auto px-2 overflow-x-auto scrollbar-none"
+      {/* NAV — always visible below header, never scrolls away */}
+      <nav className="bg-[#1B3A8C] text-white shadow-md z-[1500]" style={{flexShrink:0}}>
+        <div className="max-w-screen-2xl mx-auto px-2 overflow-x-auto"
           style={{scrollbarWidth:'none',msOverflowStyle:'none'}}>
           <div className="flex items-center min-h-[48px] gap-1 w-max min-w-full py-1.5 px-1">
             {PAGES.map(p=>{
@@ -550,8 +550,9 @@ export default function Dashboard(){
         </div>
       </nav>
 
-      {/* MAIN */}
-      <main className="max-w-screen-2xl mx-auto w-full px-3 py-4">
+      {/* MAIN — only this area scrolls */}
+      <main className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="max-w-screen-2xl mx-auto w-full px-3 py-4">
 
         {loading&&(
           <div className="flex justify-center items-center h-64">
@@ -1053,11 +1054,11 @@ export default function Dashboard(){
             )}
           </>
         )}
-      </main>
-
-      <footer className="text-center py-3 text-xs text-gray-400 border-t border-gray-100">
+      </div>{/* end inner wrapper */}
+      <footer className="text-center py-3 text-xs text-gray-400 border-t border-gray-100 shrink-0">
         รายงาน Movement คนรุ่นใหม่คืนถิ่น · สำนัก 6 สสส. · ข้อมูล ณ วันที่โหลด
       </footer>
+      </main>
     </div>
   );
 }
