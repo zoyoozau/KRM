@@ -373,9 +373,11 @@ function Badge({text,color}){
 }
 
 const PAGES=[
-  {id:'overview',label:'ภาพรวม',icon:'📊'},
-  {id:'assess',  label:'ประเมินโครงการ',icon:'📈'},
-  {id:'mapping', label:'mapping โครงการ',icon:'🗺️'},
+  {id:'overview', label:'ภาพรวม',       icon:'📊'},
+  {id:'assess',   label:'ประเมินโครงการ',icon:'📈'},
+  {id:'mapping',  label:'mapping',       icon:'🗺️'},
+  {id:'network',  label:'ภาคีคนรุ่นใหม่',icon:'🤝', soon:true},
+  {id:'quality',  label:'สรุปเชิงคุณภาพ',icon:'📝', soon:true},
 ];
 const MENTOR_PER_PAGE=10;
 
@@ -517,47 +519,48 @@ export default function Dashboard(){
         </div>
       </header>
 
-      {/* NAV */}
+      {/* NAV — desktop top bar */}
       <nav className="bg-[#1B3A8C] text-white shadow-md sticky top-0 z-40">
-        <div className="max-w-screen-2xl mx-auto px-3 flex items-center min-h-[40px] gap-1">
-          <div className="hidden md:flex gap-1 py-1 shrink-0">
-            {PAGES.map(p=>(
-              <button key={p.id} onClick={()=>{setPage(p.id);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setProgressFilter(null);setExpandedAssessIdx(null);setFadeKey(k=>k+1);}}
-                className={`px-3 py-1 rounded text-xs font-bold whitespace-nowrap transition-all ${page===p.id?'bg-white text-[#1B3A8C] shadow':'hover:bg-white/20'}`}>
-                {p.icon} {p.label}
+        <div className="max-w-screen-2xl mx-auto px-4 flex items-center min-h-[44px] gap-1">
+          {PAGES.map(p=>{
+            const navClick=()=>{if(p.soon)return;setPage(p.id);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setProgressFilter(null);setExpandedAssessIdx(null);setFadeKey(k=>k+1);};
+            return(
+              <button key={p.id} onClick={navClick}
+                className={`relative px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all duration-200
+                  ${page===p.id?'bg-white text-[#1B3A8C] shadow-md':'hover:bg-white/15 text-white/80 hover:text-white'}
+                  ${p.soon?'opacity-50 cursor-not-allowed':''}`}>
+                <span>{p.icon}</span>
+                <span className="ml-1 hidden sm:inline">{p.label}</span>
+                {p.soon&&<span className="absolute -top-1 -right-1 bg-amber-400 text-[#1B3A8C] text-[9px] font-extrabold px-1 rounded-full leading-tight">soon</span>}
+                {page===p.id&&<span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-[#1B3A8C] rounded-full"/>}
               </button>
-            ))}
-          </div>
-          <div className="flex-1 flex flex-wrap gap-1.5 justify-end py-1 overflow-hidden">
-            <select value={region} onChange={e=>changeRegion(e.target.value)}
-              className="bg-white/10 border border-white/25 text-white rounded px-2 py-0.5 text-xs focus:outline-none">
-              <option value="ทั้งหมด" className="text-black">🌏 ทุกภาค</option>
-              {REGIONS.map(r=><option key={r} value={r} className="text-black">{r}</option>)}
-            </select>
-            <select value={province} onChange={e=>setProvince(e.target.value)}
-              className="bg-white/10 border border-white/25 text-white rounded px-2 py-0.5 text-xs focus:outline-none">
-              <option value="ทั้งหมด" className="text-black">📍 ทุกจังหวัด</option>
-              {allProvinces.map(p=><option key={p} value={p} className="text-black">{p}</option>)}
-            </select>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 ค้นหา..."
-              className="bg-white/10 border border-white/25 text-white placeholder-white/50 rounded px-2 py-0.5 text-xs focus:outline-none w-24 md:w-32"/>
-          </div>
-          <button className="md:hidden px-2 py-1 text-sm shrink-0" onClick={()=>setMenuOpen(!menuOpen)}>☰</button>
+            );
+          })}
         </div>
-        {menuOpen&&(
-          <div className="md:hidden px-3 pb-2 flex flex-col gap-1 border-t border-white/20">
-            {PAGES.map(p=>(
-              <button key={p.id} onClick={()=>{setPage(p.id);setMenuOpen(false);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setFadeKey(k=>k+1);}}
-                className={`text-left px-3 py-2 rounded text-sm font-bold ${page===p.id?'bg-white text-[#1B3A8C]':'hover:bg-white/20'}`}>
-                {p.icon} {p.label}
-              </button>
-            ))}
-          </div>
-        )}
       </nav>
 
+      {/* BOTTOM TAB BAR — mobile only */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#1B3A8C] border-t border-white/20 flex safe-area-bottom"
+        style={{paddingBottom:'env(safe-area-inset-bottom)'}}>
+        {PAGES.map(p=>{
+          const tabClick=()=>{if(p.soon)return;setPage(p.id);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setProgressFilter(null);setExpandedAssessIdx(null);setFadeKey(k=>k+1);};
+          const isAct=page===p.id;
+          return(
+            <button key={p.id} onClick={tabClick}
+              className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-all duration-200 relative active:scale-90
+                ${isAct?'text-white':'text-white/45'} ${p.soon?'opacity-40':''}`}>
+              {isAct&&<span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-white rounded-full"/>}
+              <span className={`text-xl leading-none transition-transform duration-200 ${isAct?'scale-110':''}`}>{p.icon}</span>
+              <span className={`text-[10px] leading-tight font-semibold ${isAct?'font-extrabold':''}`}
+                style={{fontSize:'9px'}}>{p.label}</span>
+              {p.soon&&<span className="absolute top-1 right-2 bg-amber-400 text-[#1B3A8C] text-[8px] font-extrabold px-1 rounded-full">soon</span>}
+            </button>
+          );
+        })}
+      </div>
+
       {/* MAIN */}
-      <main className="flex-1 max-w-screen-2xl mx-auto w-full px-3 py-4">
+      <main className="flex-1 max-w-screen-2xl mx-auto w-full px-3 py-4 pb-24 md:pb-4">
 
         {loading&&(
           <div className="flex justify-center items-center h-64">
@@ -1043,6 +1046,20 @@ export default function Dashboard(){
                 </div>
               );
             })()}
+
+            {/* ═══ COMING SOON PAGES ═══ */}
+            {(page==='network'||page==='quality')&&(
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div className="text-6xl mb-4">{page==='network'?'🤝':'📝'}</div>
+                <h2 className="text-2xl font-extrabold text-[#1B3A8C] mb-2">
+                  {page==='network'?'ภาคีคนรุ่นใหม่':'สรุปข้อมูลเชิงคุณภาพ'}
+                </h2>
+                <p className="text-gray-400 text-sm max-w-xs">หน้านี้อยู่ระหว่างการพัฒนา จะเปิดให้ใช้งานเร็วๆ นี้</p>
+                <div className="mt-6 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 text-amber-600 text-xs font-semibold">
+                  <span>⏳</span> Coming Soon
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>
