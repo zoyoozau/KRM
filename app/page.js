@@ -538,75 +538,53 @@ export default function Dashboard(){
         </div>
       </header>
 
-      {/* NAV — desktop top bar */}
-      <nav className="bg-[#1B3A8C] text-white shadow-md sticky top-0 z-40">
-        <div className="max-w-screen-2xl mx-auto px-4 flex items-center min-h-[44px] gap-1">
-          {PAGES.map(p=>{
-            const navClick=()=>{if(p.soon)return;setPage(p.id);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setProgressFilter(null);setExpandedAssessIdx(null);setFadeKey(k=>k+1);};
-            return(
-              <button key={p.id} onClick={navClick}
-                className={`relative px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all duration-200
-                  ${page===p.id?'bg-white text-[#1B3A8C] shadow-md':'hover:bg-white/15 text-white/80 hover:text-white'}
-                  ${p.soon?'opacity-50 cursor-not-allowed':''}`}>
-                <span>{p.icon}</span>
-                <span className="ml-1 hidden sm:inline">{p.label}</span>
-                {p.soon&&<span className="absolute -top-1 -right-1 bg-amber-400 text-[#1B3A8C] text-[9px] font-extrabold px-1 rounded-full leading-tight">soon</span>}
-                {page===p.id&&<span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-[#1B3A8C] rounded-full"/>}
-              </button>
-            );
-          })}
+      {/* NAV — sticky top, ใช้ได้ทั้ง mobile + desktop */}
+      <nav className="bg-[#1B3A8C] text-white shadow-md sticky top-0 z-[1500]">
+        <div className="max-w-screen-2xl mx-auto px-2 overflow-x-auto scrollbar-none"
+          style={{scrollbarWidth:'none',msOverflowStyle:'none'}}>
+          <div className="flex items-center min-h-[48px] gap-1 w-max min-w-full py-1.5 px-1">
+            {PAGES.map(p=>{
+              const navClick=()=>{
+                if(p.soon)return;
+                showToast(p);
+                setPage(p.id);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setProgressFilter(null);setExpandedAssessIdx(null);setFadeKey(k=>k+1);
+              };
+              const isAct=page===p.id;
+              return(
+                <button key={p.id} onClick={navClick}
+                  className={`relative flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold whitespace-nowrap transition-all duration-200 active:scale-95 text-xs
+                    ${isAct?'bg-white text-[#1B3A8C] shadow-md':'text-white/75 hover:bg-white/15 hover:text-white'}
+                    ${p.soon?'opacity-50 cursor-not-allowed':''}`}>
+                  <span className="text-base leading-none">{p.icon}</span>
+                  <span>{p.label}</span>
+                  {p.soon&&<span className="absolute -top-1.5 -right-1 bg-amber-400 text-[#1B3A8C] text-[8px] font-extrabold px-1.5 py-0.5 rounded-full leading-none">soon</span>}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </nav>
 
-      {/* BOTTOM TAB BAR — mobile only */}
-      {/* Page name toast — mobile only */}
+      {/* TOAST — กลางจอ เมื่อเปลี่ยนหน้า */}
       {pageToast&&(
-        <div className={`md:hidden fixed pointer-events-none ${pageToast.phase==='in'?'page-toast-in':'page-toast-out'}`} style={{zIndex:3000}}
-          style={{top:'42%',left:'50%',transform:'translate(-50%,-50%)'}}>
+        <div className={`fixed pointer-events-none ${pageToast.phase==='in'?'page-toast-in':'page-toast-out'}`}
+          style={{top:'45%',left:'50%',zIndex:9999}}>
           <div style={{
-            background:'linear-gradient(135deg,rgba(27,58,140,0.97),rgba(11,30,80,0.97))',
-            backdropFilter:'blur(16px)',WebkitBackdropFilter:'blur(16px)',
-            borderRadius:24,padding:'20px 36px',
-            boxShadow:'0 24px 60px rgba(0,0,0,0.4),0 0 0 1px rgba(255,255,255,0.12)',
-            display:'flex',flexDirection:'column',alignItems:'center',gap:10,
-            minWidth:180,
+            background:'linear-gradient(135deg,rgba(27,58,140,0.96),rgba(11,30,80,0.96))',
+            backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',
+            borderRadius:28,padding:'24px 40px',
+            boxShadow:'0 32px 80px rgba(0,0,0,0.45),0 0 0 1px rgba(255,255,255,0.12)',
+            display:'flex',flexDirection:'column',alignItems:'center',gap:12,minWidth:200,
           }}>
-            <span style={{fontSize:48,lineHeight:1,filter:'drop-shadow(0 4px 8px rgba(0,0,0,0.3))'}}>{pageToast.icon}</span>
-            <span style={{color:'#fff',fontWeight:800,fontSize:16,letterSpacing:'0.02em',textAlign:'center',lineHeight:1.3}}>
-              {pageToast.label}
-            </span>
-            <div style={{width:32,height:3,background:'rgba(255,255,255,0.35)',borderRadius:4,marginTop:2}}/>
+            <span style={{fontSize:52,lineHeight:1,filter:'drop-shadow(0 4px 10px rgba(0,0,0,0.3))'}}>{pageToast.icon}</span>
+            <span style={{color:'#fff',fontWeight:800,fontSize:17,letterSpacing:'0.02em',textAlign:'center',lineHeight:1.3}}>{pageToast.label}</span>
+            <div style={{width:36,height:3,background:'rgba(255,213,0,0.6)',borderRadius:4}}/>
           </div>
         </div>
       )}
 
-      {/* BOTTOM TAB BAR — mobile only */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 flex"
-        style={{background:'rgba(27,58,140,0.97)',backdropFilter:'blur(12px)',WebkitBackdropFilter:'blur(12px)',borderTop:'1px solid rgba(255,255,255,0.15)',paddingBottom:'env(safe-area-inset-bottom)',zIndex:2000}}>
-        {PAGES.map(p=>{
-          const tabClick=()=>{
-            if(p.soon)return;
-            showToast(p);
-            setPage(p.id);setRegion('ทั้งหมด');setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setSearch('');setExpandedIdx(null);setMentorPage(0);setProgressFilter(null);setExpandedAssessIdx(null);setFadeKey(k=>k+1);
-          };
-          const isAct=page===p.id;
-          return(
-            <button key={p.id} onClick={tabClick}
-              className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 relative transition-all duration-200 active:scale-90
-                ${p.soon?'opacity-40 cursor-not-allowed':''}`}
-              style={{color:isAct?'#fff':'rgba(255,255,255,0.45)'}}>
-              {/* active indicator top line */}
-              {isAct&&<span style={{position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:28,height:2.5,background:'#FFD700',borderRadius:4}}/>}
-              <span style={{fontSize:22,lineHeight:1,transform:isAct?'scale(1.15)':'scale(1)',transition:'transform 0.2s'}}>{p.icon}</span>
-              <span style={{fontSize:9,fontWeight:isAct?800:600,lineHeight:1.2,textAlign:'center'}}>{p.label}</span>
-              {p.soon&&<span style={{position:'absolute',top:4,right:4,background:'#FCD34D',color:'#1B3A8C',fontSize:7,fontWeight:800,padding:'1px 4px',borderRadius:999}}>soon</span>}
-            </button>
-          );
-        })}
-      </div>
-
       {/* MAIN */}
-      <main className="flex-1 max-w-screen-2xl mx-auto w-full px-3 py-4 pb-24 md:pb-4">
+      <main className="flex-1 max-w-screen-2xl mx-auto w-full px-3 py-4">
 
         {loading&&(
           <div className="flex justify-center items-center h-64">
