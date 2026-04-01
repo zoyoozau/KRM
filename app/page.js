@@ -524,8 +524,8 @@ export default function Dashboard(){
         </div>
       </header>
 
-      {/* NAV — sticky top, ใช้ได้ทั้ง mobile + desktop */}
-      <nav className="bg-[#1B3A8C] text-white shadow-md sticky top-0 z-[1500]">
+      {/* NAV — fixed top, ใช้ได้ทั้ง mobile + desktop */}
+      <nav className="bg-[#1B3A8C] text-white shadow-md fixed top-0 left-0 right-0 z-[1500]">
         <div className="max-w-screen-2xl mx-auto px-2 overflow-x-auto scrollbar-none"
           style={{scrollbarWidth:'none',msOverflowStyle:'none'}}>
           <div className="flex items-center min-h-[48px] gap-1 w-max min-w-full py-1.5 px-1">
@@ -549,6 +549,9 @@ export default function Dashboard(){
           </div>
         </div>
       </nav>
+
+      {/* spacer for fixed nav */}
+      <div className="h-[48px]"/>
 
       {/* MAIN */}
       <main className="max-w-screen-2xl mx-auto w-full px-3 py-4">
