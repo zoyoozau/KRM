@@ -396,7 +396,7 @@ export default function Dashboard(){
   const mentorTo=Math.min((safeMP+1)*MENTOR_PER_PAGE,mentorRows.length);
 
   const changeRegion=val=>{setFadeKey(k=>k+1);setRegion(val);setProvince('ทั้งหมด');setMentorFilter('');setAssessFilter('');setMentorPage(0);setExpandedIdx(null);};
-  const changeMentor=name=>{setFadeKey(k=>k+1);setMentorFilter(prev=>prev===name?'':name);setAssessFilter('');setMentorPage(0);setExpandedIdx(null);};
+  const changeMentor=name=>{setMentorFilter(prev=>prev===name?'':name);setAssessFilter('');setMentorPage(0);setExpandedIdx(null);};
   // คลิก cell ในตาราง assess: filter ภาค + ประเภท พร้อมกัน
   const changeAssess=(reg,type)=>{
     setFadeKey(k=>k+1);
@@ -407,7 +407,7 @@ export default function Dashboard(){
 
   return(
     <div className="min-h-screen flex flex-col bg-white">
-      <style>{`@keyframes krmFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.krm-fade{animation:krmFadeIn 0.45s cubic-bezier(.22,.68,0,1.2) both}`}</style>
+      <style>{`@keyframes krmFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@keyframes krmFadeIn2{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.krm-fade{animation-duration:0.45s;animation-timing-function:cubic-bezier(.22,.68,0,1.2);animation-fill-mode:both}`}</style>
 
       {/* HEADER */}
       <header style={{background:'linear-gradient(90deg,#BF8B00 0%,#FFD700 30%,#FFE44D 50%,#FFD700 70%,#BF8B00 100%)'}}>
@@ -489,7 +489,7 @@ export default function Dashboard(){
               <div className="space-y-4">
 
                 {/* 3-COLUMN — fade เมื่อ filter เปลี่ยน */}
-                <div key={fadeKey} className="krm-fade space-y-4">
+                <div className="krm-fade space-y-4" style={{animationName:fadeKey%2===0?'krmFadeIn':'krmFadeIn2'}}>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,2.6fr)_minmax(0,3.4fr)] gap-4 items-start">
 
                   {/* LEFT: โครงการ + pie */}
@@ -687,7 +687,7 @@ export default function Dashboard(){
               const totalInt=assessTableBase.filter(isInt).length;
               return(
                 <div className="space-y-4">
-                  <div key={fadeKey} className="krm-fade space-y-4">
+                  <div className="krm-fade space-y-4" style={{animationName:fadeKey%2===0?'krmFadeIn':'krmFadeIn2'}}>
                   {/* TOP ROW — histogram left, breakdown table right — fade on filter change */}
                   <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(320px,1.4fr)] xl:grid-cols-[minmax(0,3fr)_minmax(360px,1.4fr)] gap-4 items-stretch">
                     {/* Left: histogram — same height as right card */}
