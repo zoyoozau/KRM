@@ -271,19 +271,29 @@ function ProgressHistogram({data,onBarClick,activeBar}){
 }
 
 // ═══════════════════════════════════════════════════
-// NETWORK PAGE — ภาคีคนรุ่นใหม่ island visualization
+// NETWORK PAGE — ภาคีคนรุ่นใหม่  Chocobo-Racing style
 // ═══════════════════════════════════════════════════
-const ISLAND_CFG=[
-  {key:'หมวดสุขภาพ',             label:'สุขภาพ',     icon:'🏥', color:'#F472B6',dark:'#BE185D',bg:'#FDF2F8',
-   xPct:'12%',yPct:'10%',delay:0,   floatK:'islFloatA',br:'55% 45% 60% 40%/50% 60% 40% 50%'},
-  {key:'หมวดเศรษฐกิจ',           label:'เศรษฐกิจ',   icon:'💼', color:'#FBBF24',dark:'#B45309',bg:'#FFFBEB',
-   xPct:'57%',yPct:'6%', delay:0.8, floatK:'islFloatB',br:'45% 55% 40% 60%/60% 40% 55% 45%'},
-  {key:'หมวดสังคม',              label:'สังคม',      icon:'🤝', color:'#60A5FA',dark:'#1D4ED8',bg:'#EFF6FF',
-   xPct:'80%',yPct:'48%',delay:1.5, floatK:'islFloatA',br:'60% 40% 55% 45%/45% 55% 40% 60%'},
-  {key:'หมวดวิชาการ/การศึกษา',   label:'วิชาการ',    icon:'📚', color:'#A78BFA',dark:'#6D28D9',bg:'#F5F3FF',
-   xPct:'30%',yPct:'60%',delay:0.4, floatK:'islFloatB',br:'50% 50% 45% 55%/55% 45% 60% 40%'},
-  {key:'หมวดสื่อ',               label:'สื่อ',       icon:'📱', color:'#34D399',dark:'#065F46',bg:'#ECFDF5',
-   xPct:'65%',yPct:'68%',delay:1.2, floatK:'islFloatA',br:'45% 55% 50% 50%/40% 60% 45% 55%'},
+const NET_ZONES=[
+  {key:'หมวดสุขภาพ',           label:'สุขภาพ',  icon:'🏥',
+   fill:'#FF8FAB',depth:'#A8324E',stroke:'#FF4080',bg:'#FDF2F8',dark:'#BE185D',
+   cx:185,cy:158,rx:148,ry:112,rot:-8,
+   marks:[{e:'⛩️',x:185,y:118},{e:'🌸',x:138,y:165},{e:'🌿',x:228,y:182}]},
+  {key:'หมวดเศรษฐกิจ',         label:'เศรษฐกิจ',icon:'💼',
+   fill:'#FFD166',depth:'#A07000',stroke:'#F59E0B',bg:'#FFFBEB',dark:'#92400E',
+   cx:658,cy:158,rx:148,ry:112,rot:8,
+   marks:[{e:'🏪',x:658,y:118},{e:'💰',x:610,y:172},{e:'🌾',x:704,y:165}]},
+  {key:'หมวดสังคม',            label:'สังคม',   icon:'🤝',
+   fill:'#74C0FC',depth:'#1048A0',stroke:'#3B82F6',bg:'#EFF6FF',dark:'#1D4ED8',
+   cx:422,cy:275,rx:158,ry:120,rot:0,
+   marks:[{e:'🏘️',x:422,y:232},{e:'🌳',x:368,y:285},{e:'🌳',x:476,y:285}]},
+  {key:'หมวดวิชาการ/การศึกษา', label:'วิชาการ', icon:'📚',
+   fill:'#C084FC',depth:'#5B10A0',stroke:'#9333EA',bg:'#F5F3FF',dark:'#6D28D9',
+   cx:185,cy:385,rx:148,ry:110,rot:-5,
+   marks:[{e:'🏫',x:185,y:348},{e:'📐',x:140,y:393},{e:'🔭',x:228,y:390}]},
+  {key:'หมวดสื่อ',             label:'สื่อ',    icon:'📱',
+   fill:'#6EE7B7',depth:'#035C40',stroke:'#10B981',bg:'#ECFDF5',dark:'#065F46',
+   cx:658,cy:385,rx:148,ry:110,rot:5,
+   marks:[{e:'📡',x:658,y:348},{e:'🎬',x:612,y:393},{e:'🎵',x:702,y:390}]},
 ];
 
 function parseNetCSV(text){
@@ -311,208 +321,271 @@ function NetworkPage(){
   const[netRows,setNetRows]=useState([]);
   const[netLoad,setNetLoad]=useState(true);
   const[netErr,setNetErr]=useState('');
-  const[selIsland,setSelIsland]=useState(null);
+  const[selZone,setSelZone]=useState(null);
   const[netSearch,setNetSearch]=useState('');
 
   useEffect(()=>{
     fetch(NETWORK_CSV_URL)
-      .then(r=>{if(!r.ok)throw new Error('fetch error');return r.text();})
-      .then(t=>{const d=parseNetCSV(t);setNetRows(d);})
+      .then(r=>{if(!r.ok)throw new Error();return r.text();})
+      .then(t=>setNetRows(parseNetCSV(t)))
       .catch(()=>setNetErr('โหลดข้อมูลไม่ได้ กรุณาแชร์ Sheet เป็น "ทุกคนที่มีลิ้งค์"'))
       .finally(()=>setNetLoad(false));
   },[]);
 
-  const countOf=key=>netRows.filter(r=>(r['หมวดหมู่']||'')===key).length;
+  const cntOf=k=>netRows.filter(r=>(r['หมวดหมู่']||'')===k).length;
 
   const filteredOrgs=useMemo(()=>{
-    if(!selIsland)return[];
+    if(!selZone)return[];
     return netRows.filter(r=>{
-      if((r['หมวดหมู่']||'')!==selIsland)return false;
-      if(netSearch){
-        const s=netSearch.toLowerCase();
-        return(r['องค์กร']||'').toLowerCase().includes(s)||
-               (r['ภายใต้การสนับสนุน/ประเด็นเคลื่อน']||'').toLowerCase().includes(s);
-      }
+      if((r['หมวดหมู่']||'')!==selZone)return false;
+      if(netSearch){const s=netSearch.toLowerCase();return(r['องค์กร']||'').toLowerCase().includes(s)||(r['ภายใต้การสนับสนุน/ประเด็นเคลื่อน']||'').toLowerCase().includes(s);}
       return true;
     });
-  },[netRows,selIsland,netSearch]);
+  },[netRows,selZone,netSearch]);
 
-  const selCfg=ISLAND_CFG.find(i=>i.key===selIsland);
+  const selZ=NET_ZONES.find(z=>z.key===selZone);
+
+  /* bridge paths connecting adjacent zones */
+  const BRIDGES=[
+    {d:'M 318 175 C 338 205 318 228 295 252'},
+    {d:'M 524 175 C 506 205 524 228 548 252'},
+    {d:'M 307 362 C 285 374 268 355 258 316'},
+    {d:'M 537 362 C 558 374 574 353 582 314'},
+  ];
+
+  const VW=860,VH=530;
+
+  /* star positions — deterministic */
+  const STARS=Array.from({length:88},(_,i)=>({
+    cx:(i*173.1+37)%VW, cy:(i*97.7+13)%(VH*0.82),
+    r:i%7===0?1.9:i%3===0?1.2:0.7,
+    op:(i%4+3)/9,
+  }));
 
   return(
     <div className="space-y-4">
-      {/* Title bar */}
+
+      {/* title bar */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-extrabold text-[#1B3A8C]">🤝 ภาคีคนรุ่นใหม่</h2>
         <div className="flex items-center gap-2">
           {netLoad&&<span className="text-xs text-gray-400 animate-pulse">⏳ กำลังโหลด...</span>}
-          {!netLoad&&!netErr&&<span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full font-semibold">{netRows.length} องค์กร</span>}
+          {!netLoad&&!netErr&&<span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-semibold">{netRows.length} องค์กร</span>}
         </div>
       </div>
 
       {netErr&&<div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-700 text-sm">⚠️ {netErr}</div>}
 
-      {/* ── ISLAND MAP ── */}
-      <div style={{
-        position:'relative',width:'100%',paddingBottom:'52%',
-        background:'linear-gradient(175deg,#0EA5E9 0%,#0369A1 55%,#075985 100%)',
-        borderRadius:20,overflow:'hidden',
-        boxShadow:'0 12px 40px rgba(14,165,233,0.35)',
-        minHeight:260,
-      }}>
+      {/* ══ SVG WORLD MAP ══ */}
+      <div style={{borderRadius:20,overflow:'hidden',boxShadow:'0 12px 48px rgba(0,0,0,0.55)',cursor:'default'}}>
+        <svg viewBox={`0 0 ${VW} ${VH}`} width="100%" style={{display:'block'}}>
+          <defs>
+            <radialGradient id="ngSky" cx="50%" cy="40%" r="65%">
+              <stop offset="0%" stopColor="#1e3068"/>
+              <stop offset="100%" stopColor="#060618"/>
+            </radialGradient>
+            <radialGradient id="ngMoon" cx="38%" cy="33%" r="55%">
+              <stop offset="0%" stopColor="#FFFFF0"/>
+              <stop offset="100%" stopColor="#FFE082"/>
+            </radialGradient>
+            <radialGradient id="ngOcean" cx="50%" cy="0%" r="100%">
+              <stop offset="0%" stopColor="#1a6fa8"/>
+              <stop offset="100%" stopColor="#0d3d60"/>
+            </radialGradient>
+            {/* per-zone gradients */}
+            {NET_ZONES.map(z=>(
+              <radialGradient key={z.key} id={`ng${z.key.slice(4,6)}`} cx="38%" cy="32%" r="65%">
+                <stop offset="0%" stopColor={z.fill} stopOpacity="1"/>
+                <stop offset="100%" stopColor={z.depth} stopOpacity="1"/>
+              </radialGradient>
+            ))}
+            <filter id="ngGlow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="7" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <filter id="ngShadow" x="-5%" y="-5%" width="120%" height="130%">
+              <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="rgba(0,0,0,0.5)"/>
+            </filter>
+            <filter id="ngTextOut">
+              <feMorphology in="SourceAlpha" operator="dilate" radius="1.8" result="e"/>
+              <feFlood floodColor="rgba(0,0,0,0.85)" result="c"/>
+              <feComposite in="c" in2="e" operator="in" result="s"/>
+              <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
 
-        {/* ── animated waves ── */}
-        <div style={{position:'absolute',bottom:0,left:0,width:'200%',pointerEvents:'none',
-          animation:'waveAnim 8s linear infinite',opacity:0.18}}>
-          <svg viewBox="0 0 2880 80" preserveAspectRatio="none" height={50} width="100%">
-            <path d="M0,40 C240,70 480,10 720,40 C960,70 1200,10 1440,40 C1680,70 1920,10 2160,40 C2400,70 2640,10 2880,40 L2880,80 L0,80Z" fill="white"/>
-          </svg>
-        </div>
-        <div style={{position:'absolute',bottom:0,left:0,width:'200%',pointerEvents:'none',
-          animation:'waveAnim 12s linear infinite',animationDirection:'reverse',opacity:0.1}}>
-          <svg viewBox="0 0 2880 60" preserveAspectRatio="none" height={35} width="100%">
-            <path d="M0,30 C360,50 720,10 1080,30 C1440,50 1800,10 2160,30 C2520,50 2880,10 2880,30 L2880,60 L0,60Z" fill="white"/>
-          </svg>
-        </div>
+          {/* ── SKY ── */}
+          <rect width={VW} height={VH} fill="url(#ngSky)"/>
 
-        {/* ── clouds ── */}
-        {[
-          {top:'4%',left:'30%',sz:26,d:0},
-          {top:'14%',right:'18%',sz:20,d:2},
-          {top:'6%',left:'68%',sz:16,d:1},
-          {top:'2%',left:'48%',sz:18,d:3},
-        ].map((c,i)=>(
-          <div key={i} style={{
-            position:'absolute',top:c.top,left:c.left,right:c.right,
-            opacity:0.6,pointerEvents:'none',
-            animation:`islFloatB ${6+i}s ease-in-out infinite`,
-            animationDelay:`${c.d}s`,
-          }}>
-            <span style={{fontSize:c.sz}}>☁️</span>
-          </div>
-        ))}
+          {/* stars */}
+          {STARS.map((s,i)=>(
+            <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill="white" opacity={s.op}/>
+          ))}
 
-        {/* ── sparkle decorations ── */}
-        {[
-          {top:'25%',left:'42%',sz:12},{top:'40%',left:'20%',sz:10},{top:'55%',left:'50%',sz:10},
-        ].map((s,i)=>(
-          <div key={i} style={{position:'absolute',top:s.top,left:s.left,opacity:0.4,pointerEvents:'none'}}>
-            <span style={{fontSize:s.sz}}>✨</span>
-          </div>
-        ))}
+          {/* shooting star */}
+          <line x1="120" y1="55" x2="195" y2="75" stroke="white" strokeWidth="1.2" opacity="0.5" strokeLinecap="round"/>
 
-        {/* ── ISLANDS ── */}
-        {ISLAND_CFG.map((isl,idx)=>{
-          const cnt=countOf(isl.key);
-          const isSel=selIsland===isl.key;
-          return(
-            <div key={isl.key}
-              onClick={()=>{setSelIsland(p=>p===isl.key?null:isl.key);setNetSearch('');}}
-              style={{
-                position:'absolute',left:isl.xPct,top:isl.yPct,
-                width:'min(148px,19%)',height:'min(120px,15%)',
-                cursor:'pointer',
-                animation:`${isl.floatK} ${4.2+idx*0.35}s ease-in-out infinite`,
-                animationDelay:`${isl.delay}s`,
-                transform:'translateX(-50%)',
-                zIndex:isSel?20:10,
-                filter:isSel
-                  ?`drop-shadow(0 0 14px ${isl.color}) drop-shadow(0 6px 16px rgba(0,0,0,0.3))`
-                  :'drop-shadow(0 4px 14px rgba(0,0,0,0.28))',
-                transition:'filter 0.25s',
-              }}>
-              <div style={{
-                width:'100%',height:'100%',
-                background:`linear-gradient(145deg,${isl.color}DD,${isl.color})`,
-                borderRadius:isl.br,
-                border:`2.5px solid ${isSel?'white':isl.color+'AA'}`,
-                display:'flex',flexDirection:'column',
-                alignItems:'center',justifyContent:'center',gap:3,
-                boxShadow:`0 6px 20px ${isl.color}55,inset 0 2px 8px rgba(255,255,255,0.35)`,
-                position:'relative',overflow:'hidden',
-              }}>
-                {/* texture dots */}
-                <div style={{position:'absolute',top:5,left:7,width:7,height:7,borderRadius:'50%',background:'rgba(255,255,255,0.3)',pointerEvents:'none'}}/>
-                <div style={{position:'absolute',top:11,right:9,width:5,height:5,borderRadius:'50%',background:'rgba(255,255,255,0.2)',pointerEvents:'none'}}/>
-                <div style={{position:'absolute',bottom:9,left:11,width:6,height:6,borderRadius:'50%',background:'rgba(255,255,255,0.25)',pointerEvents:'none'}}/>
-                {isSel&&<div style={{position:'absolute',inset:0,background:'rgba(255,255,255,0.18)',borderRadius:'inherit',pointerEvents:'none'}}/>}
+          {/* ── MOON ── */}
+          <circle cx={798} cy={62} r={46} fill="url(#ngMoon)" opacity={0.96} filter="url(#ngGlow)"/>
+          <circle cx={816} cy={50} r={36} fill="#0a0a28" opacity={0.72}/>
+          {/* moon craters */}
+          <circle cx={782} cy={72} r={5} fill="rgba(200,180,100,0.18)"/>
+          <circle cx={795} cy={82} r={3} fill="rgba(200,180,100,0.14)"/>
 
-                <span style={{fontSize:'clamp(20px,3vw,30px)',lineHeight:1,filter:'drop-shadow(0 2px 3px rgba(0,0,0,0.2))'}}>{isl.icon}</span>
-                <span style={{fontSize:'clamp(10px,1.4vw,13px)',fontWeight:800,color:'white',
-                  textShadow:'0 1px 4px rgba(0,0,0,0.5)',textAlign:'center',lineHeight:1.2,paddingInline:6}}>
-                  {isl.label}
-                </span>
-                {!netLoad&&<span style={{
-                  fontSize:'clamp(9px,1.2vw,11px)',fontWeight:700,
-                  background:'rgba(0,0,0,0.28)',color:'white',
-                  borderRadius:999,paddingInline:7,paddingBlock:1,
-                  backdropFilter:'blur(4px)',
-                }}>
-                  {cnt} องค์กร
-                </span>}
-              </div>
-            </div>
-          );
-        })}
+          {/* ── CLOUDS ── */}
+          {[
+            {cx:310,cy:55,rx:62,ry:16,op:0.07},{cx:145,cy:88,rx:48,ry:13,op:0.06},
+            {cx:580,cy:68,rx:55,ry:14,op:0.06},{cx:445,cy:42,rx:40,ry:11,op:0.05},
+          ].map((c,i)=>(
+            <ellipse key={i} cx={c.cx} cy={c.cy} rx={c.rx} ry={c.ry} fill="white" opacity={c.op}/>
+          ))}
 
-        {/* tap hint */}
-        {!selIsland&&!netLoad&&!netErr&&(
-          <div style={{
-            position:'absolute',bottom:'8%',left:'50%',transform:'translateX(-50%)',
-            background:'rgba(0,0,0,0.38)',backdropFilter:'blur(6px)',
-            color:'white',fontSize:12,fontWeight:600,
-            borderRadius:999,paddingInline:14,paddingBlock:5,
-            whiteSpace:'nowrap',pointerEvents:'none',
-            animation:'islFloatB 3s ease-in-out infinite',
-          }}>
-            👆 แตะเกาะเพื่อดูองค์กร
-          </div>
-        )}
+          {/* ── OCEAN ── */}
+          <ellipse cx={VW/2} cy={VH*0.88} rx={VW*0.58} ry={VH*0.28} fill="url(#ngOcean)" opacity={0.55}/>
+          {/* ocean shimmer lines */}
+          {[0,1,2].map(i=>(
+            <ellipse key={i} cx={VW/2+(i-1)*80} cy={VH*0.9+i*6} rx={90-i*18} ry={4} fill="white" opacity={0.06+i*0.02}/>
+          ))}
+
+          {/* ── TITLE BANNER ── */}
+          <rect x={VW/2-148} y={10} width={296} height={38} rx={19} fill="rgba(255,209,102,0.12)" stroke="#FFD166" strokeWidth={1.5}/>
+          <text x={VW/2} y={34} textAnchor="middle" fill="#FFD166" fontSize={20} fontWeight="900"
+            fontFamily="'Sarabun',serif" letterSpacing={4} filter="url(#ngTextOut)">
+            ✦ SELECT AREA ✦
+          </text>
+
+          {/* ── BRIDGES (draw BEFORE zones) ── */}
+          {BRIDGES.map((b,i)=>(
+            <g key={i}>
+              <path d={b.d} stroke="#3D2008" strokeWidth={24} fill="none" strokeLinecap="round" opacity={0.7}/>
+              <path d={b.d} stroke="#7B4F1A" strokeWidth={18} fill="none" strokeLinecap="round"/>
+              <path d={b.d} stroke="#C8943A" strokeWidth={10} fill="none" strokeLinecap="round" opacity={0.65}/>
+              <path d={b.d} stroke="#E8C870" strokeWidth={4}  fill="none" strokeLinecap="round" opacity={0.4}/>
+            </g>
+          ))}
+
+          {/* ── ZONES ── */}
+          {NET_ZONES.map(z=>{
+            const isSel=selZone===z.key;
+            const cnt=cntOf(z.key);
+            const gradId=`ng${z.key.slice(4,6)}`;
+            return(
+              <g key={z.key} onClick={()=>{setSelZone(p=>p===z.key?null:z.key);setNetSearch('');}}
+                style={{cursor:'pointer'}} role="button" aria-label={z.label}>
+
+                {/* depth shadow layer */}
+                <ellipse cx={z.cx+4} cy={z.cy+14} rx={z.rx} ry={z.ry}
+                  fill={z.depth} opacity={0.75}
+                  transform={`rotate(${z.rot} ${z.cx} ${z.cy})`}/>
+
+                {/* main terrain face */}
+                <ellipse cx={z.cx} cy={z.cy} rx={z.rx} ry={z.ry}
+                  fill={`url(#${gradId})`}
+                  stroke={isSel?'white':z.stroke}
+                  strokeWidth={isSel?3.5:1.5}
+                  transform={`rotate(${z.rot} ${z.cx} ${z.cy})`}
+                  filter={isSel?'url(#ngGlow)':undefined}
+                  opacity={isSel?1:0.94}/>
+
+                {/* inner highlight (light patch top-left) */}
+                <ellipse cx={z.cx-z.rx*0.28} cy={z.cy-z.ry*0.28} rx={z.rx*0.48} ry={z.ry*0.32}
+                  fill="white" opacity={0.13}
+                  transform={`rotate(${z.rot} ${z.cx} ${z.cy})`}/>
+
+                {/* rim highlight */}
+                <ellipse cx={z.cx} cy={z.cy} rx={z.rx} ry={z.ry}
+                  fill="none" stroke="white" strokeWidth={1}
+                  transform={`rotate(${z.rot} ${z.cx} ${z.cy})`}
+                  opacity={0.2}/>
+
+                {/* selection dashed ring */}
+                {isSel&&(
+                  <ellipse cx={z.cx} cy={z.cy} rx={z.rx+10} ry={z.ry+10}
+                    fill="none" stroke="white" strokeWidth={2.5}
+                    strokeDasharray="9 5"
+                    transform={`rotate(${z.rot} ${z.cx} ${z.cy})`}
+                    opacity={0.9}/>
+                )}
+
+                {/* landmark emojis */}
+                {z.marks.map((m,mi)=>(
+                  <text key={mi} x={m.x} y={m.y} textAnchor="middle"
+                    dominantBaseline="middle" fontSize={18} style={{userSelect:'none'}}>
+                    {m.e}
+                  </text>
+                ))}
+
+                {/* main icon */}
+                <text x={z.cx} y={z.cy+6} textAnchor="middle" dominantBaseline="middle"
+                  fontSize={isSel?40:34} style={{userSelect:'none',transition:'font-size 0.15s'}}>
+                  {z.icon}
+                </text>
+
+                {/* zone label (below ellipse) */}
+                <text x={z.cx} y={z.cy+z.ry+22} textAnchor="middle"
+                  fill="white" fontSize={13} fontWeight="bold"
+                  filter="url(#ngTextOut)" style={{userSelect:'none'}}>
+                  {z.label}
+                </text>
+
+                {/* count badge */}
+                {!netLoad&&(
+                  <>
+                    <circle cx={z.cx+z.rx*0.70} cy={z.cy-z.ry*0.65} r={17}
+                      fill={isSel?'white':'#1e3a8a'}
+                      stroke={isSel?z.stroke:'rgba(255,255,255,0.6)'} strokeWidth={2}/>
+                    <text x={z.cx+z.rx*0.70} y={z.cy-z.ry*0.65}
+                      textAnchor="middle" dominantBaseline="middle"
+                      fill={isSel?z.depth:'white'} fontSize={10} fontWeight="bold"
+                      style={{userSelect:'none'}}>
+                      {cnt}
+                    </text>
+                  </>
+                )}
+              </g>
+            );
+          })}
+
+          {/* ── hint when none selected ── */}
+          {!selZone&&!netLoad&&!netErr&&(
+            <g>
+              <rect x={VW/2-110} y={VH-50} width={220} height={32} rx={16}
+                fill="rgba(0,0,0,0.52)"/>
+              <text x={VW/2} y={VH-29} textAnchor="middle"
+                fill="white" fontSize={13} fontWeight="600" style={{userSelect:'none'}}>
+                👆 แตะเกาะเพื่อดูองค์กร
+              </text>
+            </g>
+          )}
+        </svg>
       </div>
 
-      {/* ── ORG PANEL ── */}
-      {selIsland&&selCfg&&(
-        <div className="isl-panel" style={{
-          background:selCfg.bg,
-          border:`2px solid ${selCfg.color}55`,
-          borderRadius:16,padding:16,
-        }}>
-          {/* panel header */}
+      {/* ══ ORG PANEL ══ */}
+      {selZone&&selZ&&(
+        <div className="isl-panel" style={{background:selZ.bg,border:`2px solid ${selZ.stroke}44`,borderRadius:16,padding:16}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
             <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <span style={{
-                fontSize:36,filter:`drop-shadow(0 2px 6px ${selCfg.color}88)`,
-                animation:'islFloatB 3s ease-in-out infinite',
-                display:'inline-block',
-              }}>{selCfg.icon}</span>
+              <span style={{fontSize:34}}>{selZ.icon}</span>
               <div>
-                <h3 style={{margin:0,fontSize:16,fontWeight:800,color:selCfg.dark}}>{selCfg.key}</h3>
+                <h3 style={{margin:0,fontSize:16,fontWeight:800,color:selZ.dark}}>{selZ.key}</h3>
                 <span style={{fontSize:12,color:'#6B7280'}}>{filteredOrgs.length} องค์กร</span>
               </div>
             </div>
-            <button onClick={()=>setSelIsland(null)}
+            <button onClick={()=>setSelZone(null)}
               style={{width:30,height:30,borderRadius:'50%',border:'none',
-                background:`${selCfg.color}33`,cursor:'pointer',
-                fontSize:14,fontWeight:700,color:selCfg.dark,
-                display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,
-              }}>✕</button>
+                background:`${selZ.stroke}33`,cursor:'pointer',fontSize:14,
+                fontWeight:700,color:selZ.dark,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              ✕
+            </button>
           </div>
 
-          {/* search */}
-          <input
-            value={netSearch}
-            onChange={e=>setNetSearch(e.target.value)}
-            placeholder={`🔍 ค้นหาในหมวด${selCfg.label}...`}
-            style={{
-              width:'100%',padding:'8px 12px',borderRadius:10,
-              border:`1.5px solid ${selCfg.color}77`,
-              background:'white',fontSize:13,outline:'none',
-              marginBottom:12,boxSizing:'border-box',
-              fontFamily:'inherit',
-            }}
-          />
+          <input value={netSearch} onChange={e=>setNetSearch(e.target.value)}
+            placeholder="🔍 ค้นหาองค์กร..."
+            style={{width:'100%',padding:'8px 12px',borderRadius:10,
+              border:`1.5px solid ${selZ.stroke}66`,background:'white',
+              fontSize:13,outline:'none',marginBottom:12,
+              boxSizing:'border-box',fontFamily:'inherit'}}/>
 
-          {/* cards grid */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:10}}>
             {filteredOrgs.length===0&&(
               <div style={{textAlign:'center',color:'#9CA3AF',padding:'20px 0',gridColumn:'1/-1',fontSize:13}}>
@@ -520,22 +593,18 @@ function NetworkPage(){
               </div>
             )}
             {filteredOrgs.map((org,i)=>(
-              <div key={i} style={{
-                background:'white',borderRadius:12,padding:'12px 14px',
-                border:`1px solid ${selCfg.color}33`,
-                boxShadow:`0 2px 10px ${selCfg.color}1A`,
-                display:'flex',flexDirection:'column',gap:6,
-              }}>
+              <div key={i} style={{background:'white',borderRadius:12,padding:'12px 14px',
+                border:`1px solid ${selZ.stroke}2A`,
+                boxShadow:`0 2px 10px ${selZ.stroke}18`,
+                display:'flex',flexDirection:'column',gap:6}}>
                 <div style={{fontWeight:700,fontSize:14,color:'#111827',lineHeight:1.3}}>
                   {org['องค์กร']||'—'}
                 </div>
                 {org['ภายใต้การสนับสนุน/ประเด็นเคลื่อน']&&(
-                  <div style={{
-                    fontSize:11,color:selCfg.dark,
-                    background:selCfg.bg,border:`1px solid ${selCfg.color}44`,
-                    borderRadius:6,padding:'3px 8px',
-                    display:'inline-block',alignSelf:'flex-start',lineHeight:1.4,
-                  }}>
+                  <div style={{fontSize:11,color:selZ.dark,background:selZ.bg,
+                    border:`1px solid ${selZ.stroke}44`,borderRadius:6,
+                    padding:'3px 8px',display:'inline-block',
+                    alignSelf:'flex-start',lineHeight:1.4}}>
                     {org['ภายใต้การสนับสนุน/ประเด็นเคลื่อน']}
                   </div>
                 )}
@@ -545,14 +614,10 @@ function NetworkPage(){
                       <a key={fi}
                         href={fb.startsWith('http')?fb:`https://www.facebook.com/${fb}`}
                         target="_blank" rel="noopener noreferrer"
-                        style={{
-                          display:'inline-flex',alignItems:'center',gap:4,
-                          fontSize:11,fontWeight:600,
-                          background:'#1877F2',color:'white',
-                          borderRadius:6,padding:'4px 10px',
-                          textDecoration:'none',
-                        }}>
-                        <span style={{fontWeight:900,fontSize:13}}>f</span>
+                        style={{display:'inline-flex',alignItems:'center',gap:4,
+                          fontSize:11,fontWeight:600,background:'#1877F2',
+                          color:'white',borderRadius:6,padding:'4px 10px',textDecoration:'none'}}>
+                        <span style={{fontWeight:900}}>f</span>
                         {fi===0?'Facebook':'Page 2'}
                       </a>
                     ))}
