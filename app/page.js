@@ -367,10 +367,10 @@ function NetworkPage(){
 
       {/* title bar */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-xl font-extrabold text-[#1B3A8C]">🤝 ภาคีคนรุ่นใหม่</h2>
+        <h2 className="text-xl font-extrabold text-[#1B3A8C]">🤝 นิเวศน์คนรุ่นใหม่</h2>
         <div className="flex items-center gap-2">
           {netLoad&&<span className="text-xs text-gray-400 animate-pulse">⏳ กำลังโหลด...</span>}
-          {!netLoad&&!netErr&&<span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-semibold">{netRows.length} องค์กร</span>}
+          {!netLoad&&!netErr&&<span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-semibold">{netRows.length} กลุ่ม</span>}
         </div>
       </div>
 
@@ -553,7 +553,7 @@ function NetworkPage(){
                 fill="rgba(0,0,0,0.52)"/>
               <text x={VW/2} y={VH-29} textAnchor="middle"
                 fill="white" fontSize={13} fontWeight="600" style={{userSelect:'none'}}>
-                👆 แตะเกาะเพื่อดูองค์กร
+                👆 แตะเกาะเพื่อดูกลุ่ม
               </text>
             </g>
           )}
@@ -568,7 +568,7 @@ function NetworkPage(){
               <span style={{fontSize:34}}>{selZ.icon}</span>
               <div>
                 <h3 style={{margin:0,fontSize:16,fontWeight:800,color:selZ.dark}}>{selZ.key}</h3>
-                <span style={{fontSize:12,color:'#6B7280'}}>{filteredOrgs.length} องค์กร</span>
+                <span style={{fontSize:12,color:'#6B7280'}}>{filteredOrgs.length} กลุ่ม</span>
               </div>
             </div>
             <button onClick={()=>setSelZone(null)}
@@ -580,7 +580,7 @@ function NetworkPage(){
           </div>
 
           <input value={netSearch} onChange={e=>setNetSearch(e.target.value)}
-            placeholder="🔍 ค้นหาองค์กร..."
+            placeholder="🔍 ค้นหากลุ่ม..."
             style={{width:'100%',padding:'8px 12px',borderRadius:10,
               border:`1.5px solid ${selZ.stroke}66`,background:'white',
               fontSize:13,outline:'none',marginBottom:12,
@@ -589,7 +589,7 @@ function NetworkPage(){
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:10}}>
             {filteredOrgs.length===0&&(
               <div style={{textAlign:'center',color:'#9CA3AF',padding:'20px 0',gridColumn:'1/-1',fontSize:13}}>
-                ไม่พบองค์กรที่ค้นหา
+                ไม่พบกลุ่มที่ค้นหา
               </div>
             )}
             {filteredOrgs.map((org,i)=>(
@@ -741,7 +741,7 @@ const PAGES=[
   {id:'overview', label:'ภาพรวม',       icon:'📊'},
   {id:'assess',   label:'ประเมินโครงการ',icon:'📈'},
   {id:'mapping',  label:'mapping',       icon:'🗺️'},
-  {id:'network',  label:'ภาคีคนรุ่นใหม่',icon:'🤝'},
+  {id:'network',  label:'นิเวศน์คนรุ่นใหม่',icon:'🤝'},
   {id:'quality',  label:'สรุปเชิงคุณภาพ',icon:'📝', soon:true},
 ];
 const MENTOR_PER_PAGE=10;
