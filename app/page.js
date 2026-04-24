@@ -274,16 +274,16 @@ function ProgressHistogram({data,onBarClick,activeBar}){
 // NETWORK PAGE — นิเวศน์คนรุ่นใหม่  Chocobo-Racing style
 // ═══════════════════════════════════════════════════
 const NET_ZONES=[
-  {key:'หมวดสุขภาพ',           label:'สุขภาพ',  img:'/images/map/k01.webp',
-   left:'17%', top:'27%', stroke:'#FF4080', bg:'#FDF2F8', dark:'#BE185D'},
   {key:'หมวดเศรษฐกิจ',         label:'เศรษฐกิจ',img:'/images/map/k06.webp',
-   left:'47%', top:'10%', stroke:'#F59E0B', bg:'#FFFBEB', dark:'#92400E'},
-  {key:'หมวดสังคม',            label:'สังคม',   img:'/images/map/k04.webp',
-   left:'54%', top:'50%', stroke:'#3B82F6', bg:'#EFF6FF', dark:'#1D4ED8'},
-  {key:'หมวดวิชาการ/การศึกษา', label:'วิชาการ', img:'/images/map/k05.webp',
-   left:'23%', top:'62%', stroke:'#9333EA', bg:'#F5F3FF', dark:'#6D28D9'},
+   left:'47%', top:'8%',  stroke:'#F59E0B', bg:'#FFFBEB', dark:'#92400E'},
   {key:'หมวดสื่อ',             label:'สื่อ',    img:'/images/map/k02.webp',
-   left:'72%', top:'32%', stroke:'#10B981', bg:'#ECFDF5', dark:'#065F46'},
+   left:'76%', top:'28%', stroke:'#10B981', bg:'#ECFDF5', dark:'#065F46'},
+  {key:'หมวดสังคม',            label:'สังคม',   img:'/images/map/k04.webp',
+   left:'48%', top:'48%', stroke:'#3B82F6', bg:'#EFF6FF', dark:'#1D4ED8'},
+  {key:'หมวดวิชาการ/การศึกษา', label:'วิชาการ', img:'/images/map/k05.webp',
+   left:'18%', top:'60%', stroke:'#9333EA', bg:'#F5F3FF', dark:'#6D28D9'},
+  {key:'หมวดสุขภาพ',           label:'สุขภาพ',  img:'/images/map/k01.webp',
+   left:'78%', top:'72%', stroke:'#FF4080', bg:'#FDF2F8', dark:'#BE185D'},
 ];
 
 function parseNetCSV(text){
