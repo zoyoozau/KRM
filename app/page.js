@@ -378,16 +378,6 @@ function NetworkPage(){
                 zIndex:isSel?20:10,
               }}>
 
-              {/* bouncing arrow above icon when selected */}
-              {isSel&&(
-                <div style={{
-                  textAlign:'center',fontSize:'clamp(14px,2vw,22px)',
-                  lineHeight:1,marginBottom:2,
-                  animation:'islFloatA 0.7s ease-in-out infinite',
-                  filter:`drop-shadow(0 2px 4px ${z.stroke})`,
-                  pointerEvents:'none',
-                }}>▼</div>
-              )}
 
               {/* spotlight glow circle behind icon */}
               {isSel&&(
