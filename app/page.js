@@ -313,6 +313,7 @@ function NetworkPage(){
   const[netErr,setNetErr]=useState('');
   const[selZone,setSelZone]=useState(null);
   const[netSearch,setNetSearch]=useState('');
+  const panelRef=useRef(null);
 
   useEffect(()=>{
     fetch(NETWORK_CSV_URL)
@@ -368,7 +369,16 @@ function NetworkPage(){
           const cnt=cntOf(z.key);
           return(
             <div key={z.key}
-              onClick={()=>{setSelZone(p=>p===z.key?null:z.key);setNetSearch('');}}
+              onClick={()=>{
+                const isOpening=selZone!==z.key;
+                setSelZone(p=>p===z.key?null:z.key);
+                setNetSearch('');
+                if(isOpening){
+                  setTimeout(()=>{
+                    panelRef.current?.scrollIntoView({behavior:'smooth',block:'start'});
+                  },120);
+                }
+              }}
               style={{
                 position:'absolute',
                 left:z.left,top:z.top,
@@ -440,7 +450,7 @@ function NetworkPage(){
 
       {/* ══ ORG PANEL ══ */}
       {selZone&&selZ&&(
-        <div className="isl-panel" style={{
+        <div ref={panelRef} className="isl-panel" style={{
           background:selZ.bg,border:`2px solid ${selZ.stroke}44`,
           borderRadius:16,padding:16,
         }}>
