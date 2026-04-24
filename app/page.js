@@ -362,20 +362,6 @@ function NetworkPage(){
           style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',objectPosition:'center'}}
         />
 
-        {/* ── SELECT AREA title ── */}
-        <div style={{
-          position:'absolute',top:'3%',left:'50%',transform:'translateX(-50%)',
-          fontFamily:"'Sarabun',sans-serif",fontWeight:900,
-          fontSize:'clamp(20px,4vw,42px)',
-          color:'#FFE030',
-          WebkitTextStroke:'3px #1a5c00',
-          textShadow:'3px 3px 0 #0a3000, -1px -1px 0 #0a3000, 0 4px 12px rgba(0,0,0,0.5)',
-          letterSpacing:4,whiteSpace:'nowrap',
-          pointerEvents:'none',
-        }}>
-          ✦ SELECT AREA ✦
-        </div>
-
         {/* ── zone icons ── */}
         {NET_ZONES.map(z=>{
           const isSel=selZone===z.key;
@@ -390,42 +376,53 @@ function NetworkPage(){
                 width:'min(120px,17%)',
                 cursor:'pointer',
                 zIndex:isSel?20:10,
-                transition:'transform 0.2s',
               }}>
 
-              {/* glow ring when selected */}
-              {isSel&&<div style={{
-                position:'absolute',inset:'-10px -10px -18px',
-                border:`3px solid white`,
-                borderRadius:14,
-                boxShadow:`0 0 18px ${z.stroke}, 0 0 36px ${z.stroke}88`,
-                pointerEvents:'none',
-                animation:'islFloatB 1.8s ease-in-out infinite',
-              }}/>}
+              {/* bouncing arrow above icon when selected */}
+              {isSel&&(
+                <div style={{
+                  textAlign:'center',fontSize:'clamp(14px,2vw,22px)',
+                  lineHeight:1,marginBottom:2,
+                  animation:'islFloatA 0.7s ease-in-out infinite',
+                  filter:`drop-shadow(0 2px 4px ${z.stroke})`,
+                  pointerEvents:'none',
+                }}>▼</div>
+              )}
+
+              {/* spotlight glow circle behind icon */}
+              {isSel&&(
+                <div style={{
+                  position:'absolute',
+                  top:'30%',left:'10%',right:'10%',bottom:'-8%',
+                  background:`radial-gradient(ellipse,${z.stroke}88 0%,transparent 72%)`,
+                  borderRadius:'50%',
+                  pointerEvents:'none',
+                  animation:'islFloatB 1.5s ease-in-out infinite',
+                }}/>
+              )}
 
               {/* icon image */}
               <img src={z.img} alt={z.label} style={{
-                width:'100%',height:'auto',display:'block',
+                width:'100%',height:'auto',display:'block',position:'relative',
                 filter:isSel
-                  ?`drop-shadow(0 0 10px ${z.stroke}) drop-shadow(0 4px 10px rgba(0,0,0,0.55))`
-                  :'drop-shadow(0 4px 10px rgba(0,0,0,0.45))',
-                transform:isSel?'scale(1.15)':'scale(1)',
-                transition:'transform 0.2s,filter 0.2s',
+                  ?`drop-shadow(0 0 8px white) drop-shadow(0 0 16px ${z.stroke}) drop-shadow(0 4px 8px rgba(0,0,0,0.5))`
+                  :'drop-shadow(0 3px 8px rgba(0,0,0,0.45))',
+                transform:isSel?'scale(1.18)':'scale(1)',
+                transition:'transform 0.25s,filter 0.25s',
               }}/>
 
               {/* label + count pill */}
               <div style={{
-                marginTop:3,textAlign:'center',
-                background:isSel?`${z.stroke}EE`:'rgba(0,0,0,0.58)',
+                marginTop:4,textAlign:'center',
+                background:isSel?z.stroke:'rgba(0,0,0,0.6)',
                 backdropFilter:'blur(4px)',
-                borderRadius:8,
-                padding:'3px 6px 4px',
-                border:isSel?`2px solid white`:'1.5px solid rgba(255,255,255,0.25)',
-                boxShadow:isSel?`0 0 12px ${z.stroke}88`:'none',
-                transition:'background 0.2s',
+                borderRadius:20,
+                padding:'4px 8px',
+                boxShadow:isSel?`0 4px 16px ${z.stroke}99,0 0 0 2px white`:'none',
+                transition:'background 0.25s,box-shadow 0.25s',
               }}>
                 <div style={{fontSize:'clamp(9px,1.4vw,13px)',fontWeight:800,color:'white',
-                  textShadow:'0 1px 3px rgba(0,0,0,0.8)',lineHeight:1.2}}>
+                  textShadow:'0 1px 3px rgba(0,0,0,0.6)',lineHeight:1.3}}>
                   {z.label}
                 </div>
                 {!netLoad&&<div style={{fontSize:'clamp(8px,1.1vw,11px)',color:'#FFE030',fontWeight:700,lineHeight:1.2}}>
